@@ -1,0 +1,87 @@
+<!-- 🌍 Global Layout Container -->
+<div class="flex h-screen w-full bg-bg-main overflow-hidden text-text-primary select-none">
+
+  <!-- 🎯 Far Left: Minimalist Side Nav (Always visible, click to toggle history) -->
+  <nav class="nav-rail w-[60px] flex-shrink-0 flex flex-col items-center py-6 border-r border-border bg-bg-main gap-4 cursor-pointer"
+       (click)="uiState.toggleHistory()">
+
+    <!-- Collapse / Expand arrow (top) — always shows expand/collapse state -->
+    <div class="nav-item group">
+      <i [class]="uiState.showHistory() ? 'pi pi-angle-left' : 'pi pi-angle-right'"
+         class="text-lg text-text-muted transition-all group-hover:text-accent"></i>
+      <div class="nav-tooltip">{{ uiState.showHistory() ? 'Collapse' : 'Expand' }}</div>
+    </div>
+
+    <!-- New Chat -->
+    <div class="nav-item group" (click)="$event.stopPropagation(); newChat()">
+      <i class="pi pi-plus text-lg text-text-muted transition-colors group-hover:text-accent"></i>
+      <div class="nav-tooltip">New Chat</div>
+    </div>
+
+    <!-- Knowledge Base (file icon) -->
+    <div class="nav-item group" [class.active-nav]="uiState.showSources()"
+         (click)="$event.stopPropagation(); uiState.toggleSources()">
+      <i class="pi pi-file-o text-lg text-text-muted transition-colors group-hover:text-accent"></i>
+      <div class="nav-tooltip">Knowledge Base</div>
+    </div>
+
+    <!-- Evidence panel -->
+    <div class="nav-item group" [class.active-nav]="uiState.showEvidence()"
+         (click)="$event.stopPropagation(); uiState.toggleEvidence()">
+      <i class="pi pi-book text-lg text-text-muted transition-colors group-hover:text-accent"></i>
+      <div class="nav-tooltip">Evidence</div>
+    </div>
+
+    <!-- Search -->
+    <div class="nav-item group" (click)="$event.stopPropagation()">
+      <i class="pi pi-search text-lg text-text-muted transition-all group-hover:text-accent"></i>
+      <div class="nav-tooltip">Search</div>
+    </div>
+
+    <!-- Settings (bottom) -->
+    <div class="mt-auto nav-item group" (click)="$event.stopPropagation()">
+      <i class="pi pi-cog text-lg text-text-muted transition-all group-hover:text-accent"></i>
+      <div class="nav-tooltip">Settings</div>
+    </div>
+  </nav>
+
+  <!-- 📂 Collapsible Left Sidebar: Chat History (default open) -->
+  <aside class="sidebar-resizable bg-panel border-r border-border overflow-hidden"
+         [style.width]="uiState.showHistory() ? '220px' : '0px'">
+    <div class="w-[220px] h-full flex flex-col">
+      <div class="px-4 py-4 border-b border-border flex-shrink-0">
+        <p class="text-[10px] font-bold uppercase tracking-widest text-text-muted">Chat History</p>
+      </div>
+      <div class="flex-1 overflow-y-auto px-3 py-4 flex flex-col items-center justify-center gap-2">
+        <!-- Placeholder — wire real history later -->
+        <i class="pi pi-comments text-text-muted text-2xl opacity-30"></i>
+        <p class="text-[11px] text-text-muted opacity-40 text-center">No previous chats</p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 📂 Collapsible Sidebar: Knowledge Base (Sources) -->
+  <aside class="sidebar-resizable bg-panel border-r border-border overflow-hidden"
+         [style.width]="uiState.showSources() ? '260px' : '0px'">
+    <div class="w-[260px] h-full flex flex-col">
+       <app-left-panel />
+    </div>
+  </aside>
+
+  <!-- 💬 Center: Main Workspace/Chat Panel -->
+  <main class="flex-1 flex flex-col min-w-0 relative bg-bg-main overflow-hidden">
+    <app-chat-panel class="flex-1 flex flex-col h-full" />
+  </main>
+
+  <!-- 🔍 Collapsible Right Sidebar: Evidence -->
+  <aside class="sidebar-resizable bg-panel border-l border-border overflow-hidden"
+         [style.width]="uiState.showEvidence() ? '340px' : '0px'">
+    <div class="w-[340px] h-full flex flex-col">
+       <app-right-panel />
+    </div>
+  </aside>
+
+</div>
+
+<!-- PrimeNG Toast -->
+<p-toast position="top-right" />

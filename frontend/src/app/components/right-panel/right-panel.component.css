@@ -1,0 +1,19 @@
+.bg-panel {
+  background-color: var(--color-panel) !important;
+}
+
+.bg-accent-soft {
+  background-color: var(--color-accent-soft) !important;
+}
+
+.letter-spacing-1 {
+  letter-spacing: 0.5px;
+}
+
+:host ::ng-deep .p-skeleton {
+  background-color: var(--color-border) !important;
+}
+
+:host ::ng-deep .p-skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 122, 26, 0.05), transparent) !important;
+}

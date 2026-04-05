@@ -1,0 +1,110 @@
+<!-- ═══════════════════════════════════════════════════
+     CENTERED MODE — Hero landing input (like reference)
+     ═══════════════════════════════════════════════════ -->
+@if (isCentered) {
+  <div class="centered-wrapper">
+    <div class="centered-box centered-glow-always">
+
+      <!-- Textarea row -->
+      <div class="centered-textarea-row">
+        <textarea pTextarea
+          [(ngModel)]="inputValue"
+          [autoResize]="true"
+          [rows]="1"
+          [disabled]="chatService.loading()"
+          placeholder="Press Enter to search documents"
+          class="centered-textarea"
+          spellcheck="false"
+          autocomplete="off"
+          (focus)="focused.set(true)"
+          (blur)="focused.set(false)"
+          (keydown)="onKeydown($event)"
+        ></textarea>
+      </div>
+
+      <!-- Action bar row -->
+      <div class="centered-actions">
+        <!-- Left: action chips -->
+        <div class="centered-chips">
+          <button class="chip-icon" title="Attach file">
+            <i class="pi pi-paperclip"></i>
+          </button>
+          <button class="chip-pill">
+            <i class="pi pi-globe"></i>
+            <span>Deep Search</span>
+          </button>
+          <button class="chip-pill">
+            <i class="pi pi-lightbulb"></i>
+            <span>Reason</span>
+          </button>
+          <button class="chip-icon" title="More options">
+            <i class="pi pi-ellipsis-h"></i>
+          </button>
+        </div>
+
+        <!-- Right: send button -->
+        <button class="centered-send"
+                [class.can-send]="canSend()"
+                [disabled]="!canSend()"
+                (click)="sendMessage()">
+          @if (chatService.loading()) {
+            <i class="pi pi-spin pi-spinner"></i>
+          } @else {
+            <i class="pi pi-arrow-up"></i>
+          }
+        </button>
+      </div>
+    </div>
+
+    <!-- Bottom glow line -->
+    <div class="centered-glow-line"></div>
+  </div>
+}
+
+<!-- ═══════════════════════════════════════════════════
+     BOTTOM MODE — Compact chat input bar
+     ═══════════════════════════════════════════════════ -->
+@if (!isCentered) {
+  <div class="bottom-wrapper">
+    <div class="bottom-inner">
+      <div class="bottom-container"
+           [class.active-focus]="focused()"
+           [class.border-accent]="focused()">
+
+        <!-- Textarea -->
+        <textarea pTextarea
+          [(ngModel)]="inputValue"
+          [autoResize]="true"
+          [rows]="1"
+          [disabled]="chatService.loading()"
+          placeholder="Press Enter to search documents"
+          class="bottom-textarea"
+          spellcheck="false"
+          autocomplete="off"
+          (focus)="focused.set(true)"
+          (blur)="focused.set(false)"
+          (keydown)="onKeydown($event)"
+        ></textarea>
+
+        <!-- Send button -->
+        <button class="bottom-send"
+                [class.can-send]="canSend()"
+                [disabled]="!canSend()"
+                (click)="sendMessage()">
+          @if (chatService.loading()) {
+            <i class="pi pi-spin pi-spinner text-sm"></i>
+          } @else {
+            <i class="pi pi-send text-sm"></i>
+          }
+        </button>
+      </div>
+
+      <!-- Hints -->
+      <div class="bottom-hints">
+        <span>ENTER TO SEND</span>
+        <span class="hint-dot"></span>
+        <span>SHIFT+ENTER FOR NEW LINE</span>
+      </div>
+    </div>
+  </div>
+}

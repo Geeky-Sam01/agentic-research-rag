@@ -1,0 +1,290 @@
+/* ══════════════════════════════════════════════
+   CENTERED MODE — Hero landing input
+   ══════════════════════════════════════════════ */
+
+.centered-wrapper {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.centered-box {
+  background: var(--color-panel);
+  border: 2px solid rgba(255, 122, 26, 0.5);
+  border-radius: 24px;
+  padding: 16px 20px 12px 20px;
+  transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow:
+    0 4px 30px rgba(0, 0, 0, 0.5),
+    0 0 0 0 transparent;
+}
+
+/* Always-on glow (like reference image) */
+.centered-glow-always {
+  border-color: var(--color-accent) !important;
+  box-shadow:
+    0 0 0 1px var(--color-accent),
+    0 0 30px rgba(255, 122, 26, 0.15),
+    0 0 80px rgba(255, 122, 26, 0.08),
+    0 8px 40px rgba(0, 0, 0, 0.5) !important;
+}
+
+.centered-textarea-row {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.centered-textarea {
+  width: 100%;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  resize: none !important;
+  color: var(--color-text-primary) !important;
+  font-size: 17px !important;
+  font-weight: 400;
+  line-height: 1.5;
+  min-height: 28px;
+  max-height: 200px;
+  padding: 0 !important;
+}
+
+.centered-textarea::placeholder {
+  color: var(--color-text-muted) !important;
+  font-weight: 300;
+  letter-spacing: 0.3px;
+}
+
+/* — Action bar row — */
+.centered-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.centered-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chip-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border-soft);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 13px;
+}
+
+.chip-icon:hover {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.chip-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--color-border-soft);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.chip-pill i {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.chip-pill:hover {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  color: var(--color-text-primary);
+}
+
+.chip-pill:hover i {
+  color: var(--color-accent);
+}
+
+/* — Send button (centered) — */
+.centered-send {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border-soft);
+  background: var(--color-border);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.centered-send.can-send {
+  background: var(--color-accent) !important;
+  border-color: var(--color-accent) !important;
+  color: black !important;
+  cursor: pointer !important;
+  box-shadow: 0 0 14px var(--color-accent-glow);
+}
+
+.centered-send.can-send:hover {
+  filter: brightness(1.12);
+  box-shadow: 0 0 24px var(--color-accent-glow);
+  transform: scale(1.06);
+}
+
+/* — Glow line under centered input — */
+.centered-glow-line {
+  width: 100%;
+  height: 1px;
+  margin-top: 16px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 122, 26, 0.15) 20%,
+    var(--color-accent) 50%,
+    rgba(255, 122, 26, 0.15) 80%,
+    transparent 100%
+  );
+  position: relative;
+}
+
+.centered-glow-line::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: -2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow: 0 0 8px var(--color-accent);
+}
+
+
+/* ══════════════════════════════════════════════
+   BOTTOM MODE — Compact chat input bar
+   ══════════════════════════════════════════════ */
+
+.bottom-wrapper {
+  flex-shrink: 0;
+  padding: 12px 24px 10px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.bottom-inner {
+  width: 100%;
+  max-width: 1024px;
+}
+
+.bottom-container {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  border-radius: 16px;
+  padding: 10px 16px;
+  background: var(--color-bg-main);
+  border: 1px solid var(--color-border);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.bottom-container.active-focus {
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 1px var(--color-accent), 0 0 16px var(--color-accent-glow) !important;
+}
+
+.bottom-textarea {
+  flex: 1;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  resize: none !important;
+  color: var(--color-text-primary) !important;
+  font-size: 15px;
+  line-height: 1.5;
+  padding: 2px 0 !important;
+  min-height: 28px;
+  max-height: 180px;
+}
+
+.bottom-textarea::placeholder {
+  color: var(--color-text-muted) !important;
+  font-weight: 300;
+}
+
+/* — Send button (bottom) — */
+.bottom-send {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: var(--color-border);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bottom-send.can-send {
+  background: var(--color-accent) !important;
+  color: black !important;
+  cursor: pointer !important;
+  box-shadow: 0 0 12px var(--color-accent-glow);
+}
+
+.bottom-send.can-send:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 0 20px var(--color-accent-glow);
+  transform: scale(1.04);
+}
+
+/* — Hints — */
+.bottom-hints {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 10px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-weight: 700;
+  user-select: none;
+}
+
+.hint-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--color-border);
+}

@@ -1,0 +1,30 @@
+.avatar-assistant {
+  background-color: var(--color-accent) !important;
+  color: black !important;
+  box-shadow: 0 0 10px var(--color-accent-glow);
+}
+
+.action-btn {
+  background: var(--color-bg-soft) !important;
+  border-color: var(--color-border) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.action-btn:hover {
+  border-color: var(--color-accent) !important;
+  background: var(--color-accent-soft) !important;
+  color: var(--color-accent) !important;
+}
+
+.text-green-500 {
+  color: #22c55e !important;
+}
+
+:host ::ng-deep .p-skeleton {
+  background-color: var(--color-border) !important;
+  border-radius: 4px !important;
+}
+
+:host ::ng-deep .p-skeleton-animation-none::after {
+  content: none !important;
+}

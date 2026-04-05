@@ -1,0 +1,23 @@
+/* 🧩 Component Specific Styles for ChatPanel */
+.hero-title {
+  text-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+.pro-button {
+  box-shadow: 0 4px 15px rgba(255, 122, 26, 0.1);
+  letter-spacing: 0.1em;
+}
+
+.pro-button:hover {
+  transform: translateY(-1px);
+}
+
+.doc-chip {
+  transition: all 0.2s ease;
+}
+
+.doc-chip:hover {
+  background: rgba(255, 122, 26, 0.08);
+  border-color: rgba(255, 122, 26, 0.4);
+  color: var(--color-text-primary);
+}

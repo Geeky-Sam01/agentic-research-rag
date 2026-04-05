@@ -1,0 +1,55 @@
+<div class="relative w-full h-full">
+  <div #scrollContainer class="message-container absolute inset-0 overflow-y-auto px-4 py-8 scroll-smooth space-y-2" (scroll)="onScroll($event)">
+
+    <!-- Empty state (Onboarding) -->
+    @if (chatService.messages().length === 0 && !chatService.loading()) {
+      <div class="flex flex-col items-center justify-center h-full gap-8 pb-12">
+        <!-- Icon Wrapper -->
+        <div class="logo-box w-20 h-20 rounded-3xl flex items-center justify-center bg-bg-soft border border-border shadow-2xl relative shadow-accent/5">
+          <i class="pi pi-sparkles text-accent text-3xl"></i>
+          <div class="absolute inset-0 rounded-3xl bg-accent opacity-5 blur-xl"></div>
+        </div>
+
+        <!-- Welcome Content -->
+        <div class="text-center px-6 max-w-lg">
+          <h2 class="text-xl font-bold tracking-tight text-text-primary mb-3 uppercase letter-spacing-1">
+            RAG Research Assistant
+          </h2>
+          <p class="text-[13px] text-text-secondary leading-relaxed opacity-80">
+            Upload your documents in the side panel to start building your knowledge base.
+            The assistant will use semantic search to ground its answers in your data.
+          </p>
+        </div>
+
+        <!-- Quick Start Prompts -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md w-full px-4">
+          @for (prompt of examplePrompts; track prompt) {
+            <button class="prompt-chip text-[11.5px] text-left px-4 py-3.5 rounded-xl transition-all bg-panel border border-border hover:border-accent/40 text-text-secondary hover:text-text-primary leading-snug font-medium shadow-sm active:scale-98"
+                    (click)="usePrompt(prompt)">
+              {{ prompt }}
+            </button>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Messages -->
+    <div class="max-w-5xl mx-auto w-full px-2">
+      @for (msg of chatService.messages(); track msg.id) {
+            <app-message-item [message]="msg" />
+      }
+    </div>
+
+    <!-- Scroll anchor -->
+    <div #scrollAnchor class="h-4"></div>
+  </div>
+
+  <!-- Scroll-to-Bottom Floating Button -->
+  @if (showScrollButton) {
+    <button
+      class="absolute bottom-6 right-6 z-50 w-10 h-10 rounded-full bg-panel border border-border shadow-lg flex items-center justify-center text-text-muted hover:text-accent hover:border-accent/50 transition-all opacity-80 hover:opacity-100 cursor-pointer shadow-black/80"
+      (click)="scrollToBottom(true)">
+      <i class="pi pi-arrow-down text-sm"></i>
+    </button>
+  }
+</div>

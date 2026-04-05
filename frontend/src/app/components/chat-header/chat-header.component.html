@@ -1,0 +1,57 @@
+<header class="flex items-center justify-between px-6 py-4 border-b border-border bg-panel flex-shrink-0">
+
+  <!-- Left: mobile panel trigger + Brand -->
+  <div class="flex items-center gap-4">
+    <!-- Sources button (mobile only) -->
+    <button class="lg:hidden flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all text-text-secondary border border-border hover:bg-accent-soft active:scale-95"
+            (click)="uiState.toggleSources()">
+      <i class="pi pi-database text-xs text-accent"></i>
+      Sources
+    </button>
+
+    <!-- Brand -->
+    <div class="flex items-center gap-3 ml-1 lg:ml-0">
+      <div class="w-8 h-8 rounded-lg flex items-center justify-center bg-accent shadow-lg shadow-accent/20">
+        <i class="pi pi-sparkles text-black text-xs"></i>
+      </div>
+      <div>
+        <h1 class="text-[15px] font-bold tracking-tight text-text-primary leading-tight">
+          RAG Research Bot
+        </h1>
+        <div class="text-[11px] leading-tight text-text-muted mt-0.5">
+          @if (chatService.loading()) {
+            <span class="flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span>
+              Thinking…
+            </span>
+          } @else {
+            Intelligent Document Intelligence
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: actions -->
+  <div class="flex items-center gap-2">
+    <!-- Evidence button (mobile only) -->
+    @if (chatService.chunks().length > 0) {
+      <button class="lg:hidden flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all text-accent border border-accent/20 bg-accent-soft hover:bg-accent/10 active:scale-95"
+              (click)="uiState.openEvidence()">
+        <i class="pi pi-book text-xs"></i>
+        Chunks ({{ chatService.chunks().length }})
+      </button>
+    }
+
+    <!-- Clear chat -->
+    @if (chatService.messages().length > 0) {
+      <button class="flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all text-text-secondary hover:text-text-primary hover:bg-border-soft active:scale-95"
+              pTooltip="Clear conversation"
+              tooltipPosition="bottom"
+              (click)="chatService.clearMessages()">
+        <i class="pi pi-trash text-xs"></i>
+        <span class="hidden sm:inline">Reset</span>
+      </button>
+    }
+  </div>
+</header>

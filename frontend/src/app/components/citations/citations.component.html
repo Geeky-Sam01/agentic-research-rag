@@ -1,0 +1,10 @@
+<div class="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border/20">
+  @for (cite of citations; track cite.id) {
+    <p-chip
+      [label]="cite.label"
+      icon="pi pi-bookmark"
+      class="source-chip cursor-pointer text-[10px]"
+      (click)="open.emit(cite)"
+    />
+  }
+</div>

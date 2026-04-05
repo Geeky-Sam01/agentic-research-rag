@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from app.core.config import settings
 from datetime import datetime
+from collections import defaultdict
+
 
 logger = logging.getLogger(__name__)
 
@@ -71,9 +73,11 @@ class FAISSManager:
             meta = metadata[i] if i < len(metadata) else {}
             self.metadata['documents'].append({
                 "id": len(self.metadata['documents']),
-                "text": doc,
+                "text": f"{meta.get('heading', '')}\n{doc}",
                 "source": meta.get("filename", source_name),
                 "parent_id": meta.get("parent_id"),
+                "page": meta.get("page"),
+                "heading": meta.get("heading"),
                 "timestamp": datetime.now().isoformat()
             })
         
@@ -83,13 +87,31 @@ class FAISSManager:
         
         return len(self.metadata['documents'])
 
-    def get_parent_text(self, source: str, parent_id: Optional[int]) -> Optional[str]:
+    def get_parent_text(self, source: str, parent_id: Any) -> Optional[str]:
         """Retrieve the larger parent text for a given source and id."""
         if parent_id is None:
             return None
         try:
-            return self.metadata['parents'].get(source, [])[parent_id]
-        except (IndexError, KeyError):
+            parents = self.metadata['parents'].get(source, [])
+            logger.info(f"🔍 Fetching parent '{parent_id}' for source '{source}' (found {len(parents)} parents)")
+            if not parents:
+                return None
+            
+            if isinstance(parents[0], dict):
+                # New structured format: parents is a list of dicts
+                for p in parents:
+                    if p.get("id") == parent_id:
+                        logger.info(f"✅ Found parent heading: {p.get('heading')}")
+                        return p.get("text")
+                logger.warning(f"❌ Parent ID {parent_id} not found in structured metadata")
+                return None
+            else:
+                # Old format: parents is a list of strings and parent_id is an int
+                idx = int(parent_id)
+                logger.info(f"✅ Found parent index: {idx}")
+                return parents[idx]
+        except Exception as e:
+            logger.error(f"❌ Error in get_parent_text: {e}")
             return None
     
     def search(self, query_embedding: List[float], k: int = 5) -> List[Dict[str, Any]]:
@@ -101,14 +123,19 @@ class FAISSManager:
             query_array = np.array([query_embedding], dtype=np.float32)
             distances, indices = self.index.search(query_array, min(k, self.index.ntotal))
             
+            logger.info(f"🎯 FAISS search raw indices: {indices[0]}")
+            
             results = []
             for i, idx in enumerate(indices[0]):
                 if idx < len(self.metadata['documents']):
+                    similarity = float(1 / (1 + distances[0][i]))
+                    doc = self.metadata['documents'][int(idx)]
+                    logger.info(f"🏆 Rank {i+1}: Score {similarity:.4f} | Source: {doc['source']}")
                     results.append({
                         "id": int(idx),
                         "distance": float(distances[0][i]),
-                        "similarity": float(1 / (1 + distances[0][i])),  # Convert L2 to similarity
-                        "document": self.metadata['documents'][int(idx)]
+                        "similarity": similarity,
+                        "document": doc
                     })
             
             return results
@@ -157,5 +184,56 @@ class FAISSManager:
         except Exception as e:
             logger.error(f"Error saving index: {e}")
 
+    def _group_by_parent(self, results):
+        parent_scores = defaultdict(float)
+        parent_docs = {}
+
+        for r in results:
+            doc = r["document"]
+            pid = doc.get("parent_id")
+
+            if not pid:
+                continue
+
+            parent_scores[pid] += r["similarity"]
+            parent_docs[pid] = doc
+
+        return parent_scores, parent_docs
+
+
+    def _rank_parents(self, parent_scores):
+        return sorted(parent_scores.items(), key=lambda x: x[1], reverse=True)
+
+
+    def build_context(self, results, max_parents: int = 3) -> str:
+        """
+        Build final LLM context using Parent Document Retrieval.
+        """
+
+        parent_scores, parent_docs = self._group_by_parent(results)
+        ranked_parents = self._rank_parents(parent_scores)
+
+        context_blocks = []
+
+        for parent_id, score in ranked_parents[:max_parents]:
+            doc = parent_docs[parent_id]
+            source = doc["source"]
+
+            parent_text = self.get_parent_text(source, parent_id)
+
+            if not parent_text:
+                continue
+
+            context_blocks.append(
+                f"[Source: {source} | Page: {doc.get('page')} | Section: {doc.get('heading')}]\n"
+                f"{parent_text}"
+            )
+
+        final_context = "\n\n---\n\n".join(context_blocks)
+
+        logger.info(f"🧠 Built context with {len(context_blocks)} parent sections")
+
+        return final_context
+        
 # Global instance
 faiss_manager = FAISSManager()

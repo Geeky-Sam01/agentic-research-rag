@@ -86,48 +86,77 @@ async def query(request: QueryRequest) -> QueryResponse:
 
 @router.get("/query-stream")
 async def query_stream(query: str = Query(...)):
-    """Stream query response."""
-    
+    """Stream query response with proper PDR context."""
+
     if not query or not query.strip():
         raise HTTPException(status_code=400, detail="Query is required")
-    
-    logger.info(f"\n🔍 Stream Query: \"{query}\"")
-    
+
+    logger.info(f"\n Stream Query: \"{query}\"")
+
     async def event_generator():
         try:
-            # Get query embedding
+            # 🔹 Step 1: Embed query
             query_embedding = await get_embedding(query)
             logger.info("✅ Generated query embedding")
-            
-            # Search FAISS
-            results = faiss_manager.search(query_embedding, k=5)
-            
+
+            # 🔹 Step 2: Retrieve (increase depth)
+            results = faiss_manager.search(query_embedding, k=20)
+
             if not results:
                 yield f"data: {json.dumps({'content': 'No relevant documents found. Please upload documents first.'})}\n\n"
                 return
-            
+
             logger.info(f"📚 Found {len(results)} relevant chunks")
-            
-            # Build context using PDR
-            context_parts = []
+
+            # 🔹 Step 3: Build CLEAN PDR context (IMPORTANT FIX)
+            context = faiss_manager.build_context(results)
+            logger.info(f" Final Context:\n{context[:500]}...")
+
+            # 🔹 Step 4: Deduplicated parent-level sources
+            seen_parents = set()
+            sources_payload = []
+
             for r in results:
-                doc = r['document']
-                parent_text = faiss_manager.get_parent_text(doc['source'], doc.get('parent_id'))
-                text_to_use = parent_text if parent_text else doc['text']
-                context_parts.append(f"[Document: {doc['source']}]\n{text_to_use}")
-                
-            context = "\n\n---\n\n".join(context_parts)
-            
-            # Stream answer
+                doc = r["document"]
+                parent_id = doc.get("parent_id")
+
+                if parent_id in seen_parents:
+                    continue
+
+                seen_parents.add(parent_id)
+
+                parent_text = faiss_manager.get_parent_text(
+                    doc["source"], parent_id
+                )
+
+                preview = parent_text if parent_text else doc["text"]
+
+                source_name = doc["source"]
+                if doc.get("page"):
+                    source_name += f" - p.{doc['page']}"
+
+                sources_payload.append({
+                    "id": r["id"],
+                    "text": preview[:200] + ("..." if len(preview) > 200 else ""),
+                    "source": source_name,
+                    "similarity": f"{r['similarity']*100:.1f}%"
+                })
+
+            # 🔹 Step 5: Emit sources first
+            yield f"data: {json.dumps({'type': 'sources', 'sources': sources_payload})}\n\n"
+            logger.info(f" Emitted sources: {len(sources_payload)} items")
+
+            # 🔹 Step 6: Stream answer using CLEAN context
             logger.info("⏳ Streaming answer...")
+
             async for chunk in generate_answer_stream(query, context):
                 yield f"data: {json.dumps({'content': chunk})}\n\n"
-            
+
             yield f"data: {json.dumps({'content': '[DONE]'})}\n\n"
             logger.info("✅ Streaming complete")
-            
+
         except Exception as e:
             logger.error(f"Stream error: {e}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
-    
+
     return StreamingResponse(event_generator(), media_type="text/event-stream")

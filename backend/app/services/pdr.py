@@ -1,57 +1,82 @@
-from typing import List, Dict
-from app.services.document_processor import chunk_text
+from typing import List, Dict, Tuple
 
 
-def create_parent_chunks(
-    text: str,
-    parent_chunk_size: int = 1500,
-    parent_overlap: int = 200
-) -> List[str]:
+def build_pdr_structure(
+    structured_chunks: List[Dict]
+) -> Tuple[List[Dict], List[Dict]]:
     """
-    Split document into large parent sections.
+    Builds Parent Document Retrieval structure from structured chunks.
+
+    Input:
+    [
+        {
+            "text": str,
+            "page": int,
+            "heading": str
+        }
+    ]
+
+    Returns:
+    parent_chunks: [
+        {
+            "id": str,
+            "page": int,
+            "heading": str,
+            "text": str
+        }
+    ]
+
+    child_chunks: [
+        {
+            "text": str,
+            "parent_id": str,
+            "page": int,
+            "heading": str
+        }
+    ]
     """
-    return chunk_text(text, chunk_size=parent_chunk_size, overlap=parent_overlap)
 
+    parent_map = {}
+    parent_chunks = []
+    child_chunks = []
 
-def create_child_chunks(
-    parent_chunks: List[str],
-    child_chunk_size: int = 400,
-    child_overlap: int = 80
-) -> List[Dict]:
-    """
-    Split each parent chunk into smaller chunks for embedding.
-    Returns list containing chunk text + parent mapping.
-    """
+    parent_id_counter = 0
 
-    children = []
+    for chunk in structured_chunks:
+        page = chunk.get("page")
+        heading = chunk.get("heading", "General")
+        text = chunk.get("text", "")
 
-    for parent_id, parent_text in enumerate(parent_chunks):
+        # Unique parent key
+        key = f"{page}_{heading}"
 
-        small_chunks = chunk_text(
-            parent_text,
-            chunk_size=child_chunk_size,
-            overlap=child_overlap
-        )
+        if key not in parent_map:
+            parent_id = f"parent_{parent_id_counter}"
+            parent_map[key] = parent_id
 
-        for chunk in small_chunks:
-            children.append({
-                "text": chunk,
-                "parent_id": parent_id
+            parent_chunks.append({
+                "id": parent_id,
+                "page": page,
+                "heading": heading,
+                "text": text
             })
 
-    return children
+            parent_id_counter += 1
+        else:
+            # Append text to existing parent
+            parent_id = parent_map[key]
 
+            for p in parent_chunks:
+                if p["id"] == parent_id:
+                    p["text"] += "\n" + text
+                    break
 
-def build_pdr_structure(text: str):
-    """
-    Complete Parent Document Retrieval preprocessing.
-    Returns:
-        parent_chunks
-        child_chunks_with_metadata
-    """
-
-    parent_chunks = create_parent_chunks(text)
-
-    child_chunks = create_child_chunks(parent_chunks)
+        # Always create child chunk
+        child_chunks.append({
+            "text": text,
+            "parent_id": parent_map[key],
+            "page": page,
+            "heading": heading
+        })
 
     return parent_chunks, child_chunks

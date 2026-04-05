@@ -1,0 +1,73 @@
+<!-- USER message -->
+@if (message.role === 'user') {
+  <div class="flex justify-end mb-8">
+    <div class="msg-user text-[14.5px] leading-relaxed">
+      {{ message.content }}
+    </div>
+  </div>
+}
+
+<!-- ASSISTANT message -->
+@if (message.role === 'assistant') {
+  <div class="flex flex-col mb-10 group">
+    <!-- Avatar + name row -->
+    <div class="flex items-center gap-3 mb-3">
+      <div class="avatar-assistant w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 shadow-lg shadow-accent/20">
+        <i class="pi pi-sparkles text-black text-[10px]"></i>
+      </div>
+      <span class="text-[11px] font-bold tracking-widest text-text-muted uppercase">Assistant</span>
+    </div>
+
+    <!-- Processing Status Log (before answer starts) -->
+    @if (message.isStreaming && message.content.length === 0) {
+      <div class="flex flex-col gap-2.5 pl-10 pr-4 mt-1">
+        @for (status of chatService.statusHistory(); track $index) {
+          <div class="status-row flex items-center gap-2.5 text-[12.5px] font-medium text-text-secondary animate-fade-in">
+            <!-- Icon change based on status -->
+             @if ($index === chatService.statusHistory().length - 1 && chatService.loading()) {
+                <i class="pi pi-spin pi-spinner text-[11px] text-accent"></i>
+             } @else {
+                <i class="pi pi-check-circle text-[11px] text-green-500/80"></i>
+             }
+            <span [class.text-text-primary]=" $index === chatService.statusHistory().length - 1">{{ status }}</span>
+          </div>
+        }
+        
+        <!-- Skeleton below status if still empty -->
+        <div class="mt-4 space-y-3 opacity-20">
+          <p-skeleton width="85%" height="12px" />
+          <p-skeleton width="60%" height="12px" />
+        </div>
+      </div>
+    } @else {
+      <!-- Content block -->
+      <div class="pl-10 pr-4 overflow-hidden">
+        <div class="msg-assistant text-text-primary prose-assistant">
+          <markdown [data]="message.content" />
+          @if (message.isStreaming) {
+            <span class="stream-cursor"></span>
+          }
+        </div>
+
+        <!-- Citations -->
+        @if (!message.isStreaming && message.citations && message.citations.length > 0) {
+          <app-citations [citations]="message.citations" (open)="onCitationClick($event)" />
+        }
+
+        <!-- Action row (visible on message end or hover) -->
+        @if (!message.isStreaming && message.content) {
+          <div class="flex items-center gap-2 mt-4 transition-all duration-200 opacity-60 hover:opacity-100">
+            <button class="action-btn flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-panel border border-border hover:border-accent/40 text-text-secondary hover:text-accent transition-all active:scale-95"
+                    [class.text-green-500]="copied"
+                    pTooltip="Copy response"
+                    tooltipPosition="top"
+                    (click)="copyContent()">
+              <i [class]="copied ? 'pi pi-check' : 'pi pi-copy'" class="text-[12px]"></i>
+              {{ copied ? 'COPIED' : 'COPY' }}
+            </button>
+          </div>
+        }
+      </div>
+    }
+  </div>
+}

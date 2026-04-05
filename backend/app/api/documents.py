@@ -5,7 +5,7 @@ from pathlib import Path
 from app.core.config import settings
 from app.services.embeddings import get_embeddings, get_cache_stats
 from app.services.faiss_service import faiss_manager
-from app.services.document_processor import extract_text_from_file
+from app.services.document_processor import extract_text_from_file, chunk_structured_document
 from app.services.pdr import build_pdr_structure
 from app.models.schemas import DocumentUploadResponse
 
@@ -30,22 +30,33 @@ async def upload_document(file: UploadFile = File(...)) -> DocumentUploadRespons
         with open(file_path, "wb") as f:
             f.write(content)
 
-        # Extract text
-        logger.info("📖 Extracting text...")
-        text = extract_text_from_file(str(file_path))
+        # ---------------- OCR EXTRACTION ---------------- #
+        logger.info("📖 Extracting structured document...")
 
-        if not text or len(text.strip()) == 0:
+        document = extract_text_from_file(str(file_path))
+
+        if not document or len(document) == 0:
             raise HTTPException(status_code=400, detail="Could not extract text from file")
 
-        # ---------- PDR PIPELINE ----------
+        # ---------------- CHUNKING ---------------- #
+        logger.info("✂️ Creating structured chunks...")
+
+        structured_chunks = chunk_structured_document(document)
+
+        if not structured_chunks:
+            raise HTTPException(status_code=400, detail="No chunks created from document")
+
+        logger.info(f"📚 Total chunks: {len(structured_chunks)}")
+
+        # ---------------- PDR ---------------- #
         logger.info("🧠 Building Parent Document Retrieval structure...")
 
-        parent_chunks, child_chunks = build_pdr_structure(text)
+        parent_chunks, child_chunks = build_pdr_structure(structured_chunks)
 
         logger.info(f"📦 Parent sections: {len(parent_chunks)}")
         logger.info(f"📚 Child chunks: {len(child_chunks)}")
 
-        # Extract texts for embedding
+        # ---------------- EMBEDDINGS ---------------- #
         child_texts = [c["text"] for c in child_chunks]
 
         logger.info("🔢 Generating embeddings...")
@@ -54,16 +65,21 @@ async def upload_document(file: UploadFile = File(...)) -> DocumentUploadRespons
 
         logger.info(f"✅ Generated {len(embeddings)} embeddings")
 
-        logger.info("💾 Adding to FAISS index...")
+        # ---------------- METADATA ---------------- #
+        logger.info("💾 Preparing metadata...")
 
-        # Metadata mapping
         metadata = [
             {
                 "parent_id": c["parent_id"],
-                "filename": file.filename
+                "filename": file.filename,
+                "page": c.get("page"),
+                "heading": c.get("heading")
             }
             for c in child_chunks
         ]
+
+        # ---------------- FAISS ---------------- #
+        logger.info("💾 Adding to FAISS index...")
 
         total_indexed = faiss_manager.add_vectors(
             embeddings,
@@ -93,7 +109,6 @@ async def upload_document(file: UploadFile = File(...)) -> DocumentUploadRespons
     finally:
         if file_path.exists():
             file_path.unlink()
-
 
 @router.get("/stats")
 async def get_stats():

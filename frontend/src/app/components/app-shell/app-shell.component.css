@@ -1,0 +1,62 @@
+.nav-rail {
+  transition: background 0.2s ease;
+}
+
+.nav-rail:hover {
+  background: rgba(255, 122, 26, 0.02) !important;
+}
+
+.nav-item {
+  position: relative !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  padding: 10px !important;
+  border-radius: 10px !important;
+}
+
+.nav-item:hover {
+  background: var(--color-panel);
+}
+
+.nav-item:hover i {
+  color: var(--color-accent) !important;
+  transform: scale(1.1);
+}
+
+.active-nav {
+  background: var(--color-accent-soft) !important;
+}
+
+.active-nav i {
+  color: var(--color-accent) !important;
+}
+
+.nav-tooltip {
+  position: absolute !important;
+  left: calc(100% + 12px) !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  background: var(--color-panel) !important;
+  border: 1px solid var(--color-border) !important;
+  color: var(--color-text-primary) !important;
+  padding: 4px 10px !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  white-space: nowrap !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.15s ease-out !important;
+  z-index: 50 !important;
+}
+
+.nav-item:hover .nav-tooltip {
+  opacity: 1 !important;
+}
+
+.sidebar-resizable {
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+:host ::ng-deep .p-sidebar {
+  background-color: var(--color-panel) !important;
+}

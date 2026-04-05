@@ -4,7 +4,7 @@ import os
 
 class Settings(BaseSettings):
     # API Keys
-    HUGGINGFACE_API_KEY: str = ""
+    HF_TOKEN: str = ""
     OPENROUTER_API_KEY: str
     
     # Server Config

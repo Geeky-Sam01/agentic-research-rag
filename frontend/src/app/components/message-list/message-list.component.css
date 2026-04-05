@@ -1,0 +1,26 @@
+.message-container {
+  background-color: var(--color-bg-main) !important;
+  scroll-behavior: smooth !important;
+}
+
+.logo-box {
+  background-color: var(--color-panel) !important;
+  border-color: var(--color-border) !important;
+}
+
+.prompt-chip {
+  background-color: var(--color-panel) !important;
+  border-color: var(--color-border) !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.prompt-chip:hover {
+  background-color: var(--color-accent-soft) !important;
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 4px 12px var(--color-accent-glow);
+  transform: translateY(-1px);
+}
+
+.letter-spacing-1 {
+  letter-spacing: 0.5px;
+}

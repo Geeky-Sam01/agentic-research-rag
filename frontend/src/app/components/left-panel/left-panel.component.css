@@ -1,0 +1,41 @@
+.bg-panel {
+  background-color: var(--color-panel) !important;
+}
+
+.bg-accent-soft {
+  background-color: var(--color-accent-soft) !important;
+}
+
+.upload-btn {
+  background-color: var(--color-accent) !important;
+  color: black !important;
+  cursor: pointer !important;
+  box-shadow: 0 4px 12px var(--color-accent-glow);
+}
+
+.upload-btn:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 4px 20px var(--color-accent-glow);
+  transform: translateY(-1px);
+}
+
+.upload-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px var(--color-accent-glow);
+}
+
+.stats-icon {
+  background-color: var(--color-accent);
+}
+
+.text-green-500 {
+  color: #22c55e !important;
+}
+
+.text-red-500 {
+  color: #ef4444 !important;
+}
+
+.letter-spacing-1 {
+  letter-spacing: 0.5px;
+}

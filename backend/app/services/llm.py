@@ -3,6 +3,7 @@ import json
 import logging
 from app.core.config import settings
 from typing import AsyncGenerator
+from app.services.prompts import RAG_SYSTEM_PROMPT, RAG_USER_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -11,17 +12,9 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 async def generate_answer(query: str, context: str) -> str:
     """Generate answer using OpenRouter."""
     
-    system_prompt = """You are a helpful assistant answering questions based on provided documents.
-Be concise and accurate. If the answer is not in the documents, say so clearly.
-Cite the source document when relevant."""
+    system_prompt = RAG_SYSTEM_PROMPT
     
-    user_prompt = f"""Based on these documents, answer the question:
-
-{context}
-
-Question: {query}
-
-Answer:"""
+    user_prompt = RAG_USER_PROMPT.format(context=context, query=query)
     
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -60,16 +53,9 @@ Answer:"""
 async def generate_answer_stream(query: str, context: str) -> AsyncGenerator[str, None]:
     """Generate answer using OpenRouter with streaming."""
     
-    system_prompt = """You are a helpful assistant answering questions based on provided documents.
-Be concise and accurate. If the answer is not in the documents, say so clearly."""
+    system_prompt = RAG_SYSTEM_PROMPT
     
-    user_prompt = f"""Based on these documents, answer the question:
-
-{context}
-
-Question: {query}
-
-Answer:"""
+    user_prompt = RAG_USER_PROMPT.format(context=context, query=query)
     
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
