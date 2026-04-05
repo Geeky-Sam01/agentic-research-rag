@@ -1,0 +1,71 @@
+# Project Memory & Onboarding Document for Agent
+
+## Tech Stack Overview
+- **Backend:** Python, FastAPI, FAISS (Vector DB), OpenRouter/LLMs
+- **Frontend:** Angular 21, Tailwind CSS v4, PrimeNG
+- **Architecture:** 3-Pane Layout pattern (Sidebar, Main Chat, Context/Evidence panel). RAG based Chatbot.
+
+## Key Completed Features
+- **3-Pane UI Layout:** A flexible, responsive Black + Orange themed interface using Tailwind CSS v4.
+- **RAG Pipeline:** End-to-end retrieval augmented generation via FastAPI and FAISS.
+- **Real-Time Feedback:** Granular UI tracking during processing (Searching, Retrieving, Synthesizing stages).
+- **Document Processing Pipeline:** Text extraction and automatic FAISS index generation.
+- **Evidence/Citation Panel:** Displays extracted document chunks with scrolling support.
+- **LLM Integration:** Streamed chat interface integrated with OpenRouter models.
+- **Sidebar UX:** Keyboard shortcuts included (`Ctrl+B`, `Ctrl+Alt+B`), plus scroll-to-bottom features in chat.
+
+## Pending Features / Next Steps (For Future Agents)
+- **Persistent Memory:** Migrating from stateless/in-memory session chat to actual DB storage (e.g., SQLite, Postgres).
+- **Multi-user / Auth:** Support for user logins and isolated document silos per user.
+- **Advanced RAG Routing:** Upgrading the system to query multiple indices or using semantic chunking.
+- **Deployment:** Dockerizing both the FastAPI backend and Angular frontend for production.
+
+## Current RAG Pipeline Architecture
+**1. Document Processing (`backend/app/services/document_processor.py`):**
+- Documents are parsed, split into logical chunks.
+- A **Parent-Document Retrieval (PDR)** structure is utilized. Smaller chunks are created for precise vector search, but they maintain a `parent_id` linking them back to the larger surrounding context.
+
+**2. Vector Searching and Context Assembly (`backend/app/api/chat.py` & `faiss_service.py`):**
+- User queries are embedded via `get_embedding`.
+- A FAISS exact search retrieves the top `k=20` chunks.
+- Instead of feeding just the small chunks to the LLM, the pipeline resolves the `parent_id` for each chunk to fetch the **full parent text block**.
+- The parent blocks are deduplicated (preventing redundant tokens if multiple chunks from the same parent are found) and stitched together to form a rich context `faiss_manager.build_context`.
+
+**3. Streaming response (`backend/app/api/chat.py`):**
+- First, the system yields the deduplicated parent sources via Server-Sent Events (SSE) using the `type: sources` JSON format. (Including source name, page numbers, text snippets, and similarity scores).
+- Next, the `generate_answer_stream` connects to OpenRouter, feeding it the user's query and the assembled parent-context. The response tokens are streamed back to the Angular UI as they are generated.
+
+## Main Working Code Paths
+**Backend (FastAPI Engine):**
+- `backend/app/api/chat.py` -> API Endpoints for handling Chat requests and streaming.
+- `backend/app/api/documents.py` -> API Endpoints for uploading and inspecting documents.
+- `backend/app/services/llm.py` -> The OpenRouter LLM connection and request formatting.
+- `backend/app/services/faiss_service.py` -> Creating, saving, and querying FAISS embeddings.
+- `backend/app/services/document_processor.py` -> PDF/Document parsing and chunking. 
+
+**Frontend (Angular UI):**
+- `frontend/src/app/components/chat-panel/` -> The main conversational hub.
+- `frontend/src/app/components/left-panel/` -> The document management / summary view.
+- `frontend/src/app/components/right-panel/` -> The citation/evidence review area.
+- `frontend/src/app/components/message-list/` & `chat-input/` -> Micro-components for message flow.
+- `frontend/src/app/services/chat.service.ts` -> Core service bridging Angular with the FastAPI endpoints.
+- `frontend/src/styles.css` -> Global Tailwind/PrimeNG configurations.
+
+## Notes for Agents
+- This is a highly visual, premium-styled application. Any adjustments to the UI should adhere strictly to the existing Dark/Orange aesthetic and respect Tailwind CSS v4 parameters.
+- **Never track the `.venv` folder** - it uses a standard `requirements.txt` / pip environment which is properly ignored via `.gitignore`.
+
+## Current/Last Working Session (Progress Tracker)
+- **Recent Accomplishments:** 
+  - Completed the 3-Pane UI layout with Tailwind CSS v4 (Black & Orange styling/dynamic responsive panels).
+  - Wired up OpenRouter LLM integration via FastAPI and implemented live request streaming to the user.
+  - Successfully fixed Git tracking issues where the virtual environment (`.venv`) was accidentally staged (which blocked GitHub pushes due to file size). Repository is now completely clean, `.gitignore` is properly configured, and local branch was aligned and successfully pushed to `origin/main`.
+  - Pinned all `backend/requirements.txt` dependencies to their exact installed versions for reproducible builds.
+- **Current Blocker / Focus:** The user is currently at a clean stopping point after pushing code to origin. The primary focus right now is ensuring project documentation/memory is set up correctly for the next feature sprint.
+
+## Maintenance Instructions for Future Agents
+> [!IMPORTANT]
+> **READ THIS IF YOU ARE A NEW AGENT:** 
+> 1. You MUST read this `memory.txt` file at the start of your session to understand the project context.
+> 2. As you complete features, hit bugs, or modify the architecture, you MUST update this file.
+> 3. Continually update the **"Current/Last Working Session"** section above to reflect your immediate progress so the next agent spawned can pick up exactly where you left off. Do not leave the user hanging by putting context solely in the chat interface!
