@@ -21,6 +21,11 @@ export class ChatService {
   private readonly BASE_URL = 'http://localhost:8000';
 
   async sendQuery(query: string) {
+    // Retain existing streaming logic as default generic entry point
+    return this.streamChat(query);
+  }
+
+  async streamChat(query: string) {
     this.closeStream();
 
     // Ensure we have a session
@@ -143,6 +148,85 @@ export class ChatService {
         this.finishStream(assistantId);
       }
     };
+  }
+
+  async structuredChat(query: string) {
+    this.closeStream();
+
+    // Ensure we have a session
+    if (!this.historyService.currentSessionId()) {
+      await this.historyService.createNewChat();
+    }
+
+    // Push user message
+    const userMsg: Message = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: query,
+      timestamp: new Date()
+    };
+    this.messages.update((msgs: Message[]) => [...msgs, userMsg]);
+
+    const assistantId = crypto.randomUUID();
+    const assistantMsg: Message = {
+      id: assistantId,
+      role: 'assistant',
+      content: '', // No markdown text for structured mode
+      timestamp: new Date(),
+      isStreaming: true
+    };
+    this.messages.update((msgs: Message[]) => [...msgs, assistantMsg]);
+    this.loading.set(true);
+
+    if (this.docService.currentSources().length > 0) {
+      this.status.set('Searching parameters & extracting structures...');
+      this.statusHistory.set(['Searching documents...', 'Structuring output...']);
+    }
+
+    const payload = {
+      query: query,
+      stream: false
+    };
+
+    this.http.post<any>(`${this.BASE_URL}/api/chat/query-structured`, payload).subscribe({
+      next: (data) => {
+        // Handle sources
+        if (data.sources) {
+          const chunks: Chunk[] = data.sources.map((s: Source, i: number) => ({
+             id: `chunk-${i}-${Date.now()}`,
+             sourceId: s.source,
+             text: s.text,
+             similarity: s.similarity
+          }));
+          this.chunks.set(chunks);
+          
+          const citations = data.sources.map((s: Source, i: number) => ({
+             id: `cite-${i}-${Date.now()}`,
+             chunkId: `chunk-${i}-${Date.now()}`,
+             label: s.source
+          }));
+          
+          this.messages.update((msgs: Message[]) => msgs.map((m: Message) =>
+             m.id === assistantId ? { ...m, citations } : m
+          ));
+        }
+
+        // Attach structured payload
+        if (data.structuredPayload) {
+          this.messages.update((msgs: Message[]) => msgs.map((m: Message) =>
+             m.id === assistantId ? { ...m, structuredPayload: data.structuredPayload } : m
+          ));
+        }
+
+        this.finishStream(assistantId);
+      },
+      error: (err) => {
+        this.messages.update((msgs: Message[]) => msgs.map((m: Message) =>
+             m.id === assistantId ? { ...m, content: `⚠️ Error fetching structured response: ${err.message}` } : m
+        ));
+        this.finishStream(assistantId);
+      }
+    });
   }
 
   private finishStream(assistantId: string): void {

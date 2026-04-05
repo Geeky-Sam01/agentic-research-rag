@@ -16,7 +16,11 @@ export class ChatPanelComponent {
   chatService = inject(ChatService);
   docService = inject(DocumentService);
 
-  onSend(query: string): void {
-    this.chatService.sendQuery(query);
+  onSend(event: {query: string, isStructured: boolean}): void {
+    if (event.isStructured) {
+      this.chatService.structuredChat(event.query);
+    } else {
+      this.chatService.streamChat(event.query);
+    }
   }
 }

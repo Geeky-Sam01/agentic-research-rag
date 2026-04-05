@@ -1,132 +1,98 @@
-import httpx
-import json
 import logging
+from typing import AsyncGenerator, Optional, List
+
+from pydantic import BaseModel, Field
+from langchain_core.output_parsers import StrOutputParser
 from app.core.config import settings
-from typing import AsyncGenerator, Optional
-from app.services.prompts import RAG_SYSTEM_PROMPT, RAG_USER_PROMPT
+from app.core.llm_clients import get_llm_with_fallbacks
+from app.services.prompts import RAG_STREAM_PROMPT, RAG_STRUCTURED_PROMPT
+from app.services.response_parser import parse_rag_response, SummaryCard
 
 logger = logging.getLogger(__name__)
 
-OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-async def generate_answer(query: str, context: str) -> str:
-    """Generate answer using OpenRouter."""
+from typing import Literal
+
+# ── 1. Define the Schema the LLM must follow ──────────────────────────────
+class MetricItem(BaseModel):
+    label: str = Field(description="Name of the metric")
+    value: str = Field(description="Numeric or categorical value of the metric")
+    unit: Optional[str] = Field(default=None, description="Optional unit (e.g., %, USD)")
+
+class MetricBlock(BaseModel):
+    type: Literal["metric"]
+    title: str = Field(description="Title of the metric group")
+    data: List[MetricItem] = Field(description="List of metric data points")
+
+class TableBlock(BaseModel):
+    type: Literal["table"]
+    title: str = Field(description="Title of the table")
+    columns: List[str] = Field(description="List of column headers")
+    rows: List[List[str]] = Field(description="Table rows")
+
+class SummaryBlock(BaseModel):
+    type: Literal["summary"]
+    title: str = Field(description="Title of the summary")
+    text: str = Field(description="Text content of the summary")
+
+Block = MetricBlock | TableBlock | SummaryBlock
+
+class FinSightResponse(BaseModel):
+    query: str = Field(description="The user's original query")
+    intent: str = Field(description="Underlying intent of the query")
+    confidence: float = Field(description="Confidence score between 0 and 1")
+    blocks: List[Block] = Field(description="Extracted financial insight blocks")
+
+# ── 2. Streaming (Unchanged) ──────────────────────────────────────────────
+async def generate_answer_stream(
+    query: str, 
+    context: str, 
+    model_override: Optional[str] = None
+) -> AsyncGenerator[str, None]:
+    """Streaming: yields text chunks directly. Used for standard Markdown answers."""
     
-    system_prompt = RAG_SYSTEM_PROMPT
-    
-    user_prompt = RAG_USER_PROMPT.format(context=context, query=query)
+    primary = model_override if model_override else settings.LLM_MODEL
+    llm = get_llm_with_fallbacks(primary, streaming=True)
+    chain = RAG_STREAM_PROMPT | llm
     
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                OPENROUTER_API_URL,
-                json={
-                    "model": settings.LLM_MODEL,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    "max_tokens": 1024,
-                    "temperature": 0.3,
-                    "top_p": 0.9,
-                    "stream": False
-                },
-                headers={
-                    "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "http://localhost:4200",
-                    "X-OpenRouter-Title": "Agentic RAG"
-                }
-            )
-            
-            if response.status_code != 200:
-                logger.error(f"OpenRouter error: {response.text}")
-                raise Exception(f"LLM API error: {response.status_code}")
-            
-            data = response.json()
-            return data['choices'][0]['message']['content']
-            
+        async for chunk in chain.astream({"query": query, "context": context}):
+            text = chunk.content
+            if text:
+                yield text
     except Exception as e:
-        logger.error(f"LLM error: {str(e)}")
-        raise
+        logger.error(f"Streaming error: {str(e)}")
+        yield f"ERROR: {str(e)}"
 
-async def generate_answer_stream(query: str, context: str, model_override: Optional[str] = None) -> AsyncGenerator[str, None]:
-    """Generate answer using OpenRouter with streaming. Automatically falls back on 429."""
 
-    system_prompt = RAG_SYSTEM_PROMPT
-    user_prompt = RAG_USER_PROMPT.format(context=context, query=query)
+# ── 3. Structured Output (Upgraded) ───────────────────────────────────────
+async def generate_answer_structured(
+    query: str, 
+    context: str, 
+    model_override: Optional[str] = None
+) -> dict:
+    """Non-streaming: Uses native OpenRouter structured outputs. No more regex/json parsing."""
     
-    # List of models to try in order if 429 occurs
-    # Prioritize user-selected model from override, then default, then fallbacks
-    primary_model = model_override if model_override else settings.LLM_MODEL
+    primary = model_override if model_override else settings.LLM_MODEL
+    llm = get_llm_with_fallbacks(primary, streaming=False).bind(temperature=0.1)
     
-    models_to_try = [
-        primary_model,
-        "qwen/qwen-turbo:free",
-        "nvidia/nemotron-4-340b-instruct:free",
-        "minimax/minimax-01:free",
-        "google/gemma-2-9b-it:free"
-    ]
-
-    for i, model_name in enumerate(models_to_try):
-        try:
-            if i > 0:
-                logger.info(f"🔄 Switching to fallback model: {model_name}")
-                yield f"\n\n> ⚠️ **Free LLM quota exceeded.** Switching to fallback model: `{model_name}`\n> *(Note: Context might be partially lost during switch)*\n\n"
-
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                async with client.stream(
-                    "POST",
-                    OPENROUTER_API_URL,
-                    json={
-                        "model": model_name,
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt}
-                        ],
-                        "max_tokens": 1024,
-                        "temperature": 0.3,
-                        "top_p": 0.9,
-                        "stream": True
-                    },
-                    headers={
-                        "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
-                        "Content-Type": "application/json",
-                        "HTTP-Referer": "http://localhost:4200",
-                        "X-OpenRouter-Title": "Agentic RAG"
-                    }
-                ) as response:
-                    
-                    if response.status_code == 429:
-                        if i < len(models_to_try) - 1:
-                            logger.warning(f"429 for {model_name}, trying next fallback...")
-                            continue # Try next model!
-                        else:
-                            yield "ERROR: All available free model quotas exceeded. Please try again in 1 minute."
-                            return
-
-                    if response.status_code != 200:
-                        content = await response.aread()
-                        logger.error(f"OpenRouter stream error ({response.status_code}): {content.decode()}")
-                        yield f"ERROR: LLM API returned status {response.status_code}"
-                        return
-                    
-                    async for line in response.aiter_lines():
-                        if line.startswith("data:"):
-                            data_str = line[5:].strip()
-                            if data_str and data_str != "[DONE]":
-                                try:
-                                    data = json.loads(data_str)
-                                    if data.get('choices') and data['choices'][0].get('delta', {}).get('content'):
-                                        yield data['choices'][0]['delta']['content']
-                                except json.JSONDecodeError:
-                                    continue
-                    return # Success!
-
-        except Exception as e:
-            logger.error(f"LLM streaming error with {model_name}: {str(e)}")
-            if i == len(models_to_try) - 1:
-                yield f"ERROR: Connection failed after multiple attempts: {str(e)}"
-                raise
-            continue # Try next if connection failed
-
+    # ⚡ THE MAGIC LINE: Bind the Pydantic schema with strict mode
+    structured_llm = llm.with_structured_output(FinSightResponse, strict=True)
+    
+    chain = RAG_STRUCTURED_PROMPT | structured_llm
+    
+    try:
+        result: FinSightResponse = await chain.ainvoke({"query": query, "context": context})
+        
+        # Inject an overriding type parameter so the UI renderer knows it's a FinSightResponse
+        dump = result.model_dump()
+        dump["type"] = "finsight"
+        return dump
+        
+    except Exception as e:
+        logger.error(f"LLM Structured Output error: {str(e)}")
+        return SummaryCard(
+            headline="Error rendering response", 
+            key_points=[f"We encountered an error with structured outputs: {str(e)}"], 
+            conclusion="Please try again or use standard stream mode."
+        ).model_dump()

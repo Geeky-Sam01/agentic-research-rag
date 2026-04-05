@@ -7,11 +7,12 @@ import { Skeleton } from 'primeng/skeleton';
 import { ButtonModule } from 'primeng/button';
 import { Tooltip } from 'primeng/tooltip';
 import { MarkdownComponent } from 'ngx-markdown';
+import { StructuredResponseComponent } from '../structured-response/structured-response.component';
 
 @Component({
   selector: 'app-message-item',
   standalone: true,
-  imports: [CitationsComponent, Skeleton, ButtonModule, Tooltip, MarkdownComponent],
+  imports: [CitationsComponent, Skeleton, ButtonModule, Tooltip, MarkdownComponent, StructuredResponseComponent],
   templateUrl: './message-item.component.html',
   styleUrl: './message-item.component.css'
 })

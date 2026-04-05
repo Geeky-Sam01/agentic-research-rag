@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Query  # type: ignore
-from fastapi.responses import StreamingResponse  # type: ignore
+from fastapi.responses import StreamingResponse, JSONResponse  # type: ignore
 import logging
 import json
 from typing import Optional
@@ -8,7 +8,7 @@ from sentence_transformers import SentenceTransformer  # type: ignore
 from app.core.config import settings  # type: ignore
 from app.services.injest import get_client, query_qdrant  # type: ignore
 from app.services.embeddings import model as _embedder  # type: ignore
-from app.services.llm import generate_answer, generate_answer_stream  # type: ignore
+from app.services.llm import generate_answer_stream, generate_answer_structured  # type: ignore
 from app.models.schemas import QueryRequest, QueryResponse, Source  # type: ignore
 
 logger = logging.getLogger(__name__)
@@ -19,68 +19,6 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 _qdrant_client = get_client()
 # _embedder is now imported from embeddings service
 
-
-@router.post("/query")
-async def query(request: QueryRequest) -> QueryResponse:
-    """Query the RAG system."""
-    
-    if not request.query or not request.query.strip():
-        raise HTTPException(status_code=400, detail="Query is required")
-    
-    logger.info(f"\n🔍 Query: \"{request.query}\"")
-    
-    try:
-        # 🔹 Step 1: Search Qdrant
-        results = query_qdrant(
-            query    = request.query,
-            client   = _qdrant_client,
-            embedder = _embedder,
-            top_k    = 5
-        )
-        
-        if not results:
-            logger.info("⚠️ No relevant documents found")
-            return QueryResponse(
-                query=request.query,
-                answer="I could not find any relevant documents in the knowledge base. Please upload documents first.",
-                sources=[],
-                resultsFound=0,
-                model=settings.LLM_MODEL,
-                embedding=settings.EMBEDDING_MODEL
-            )
-        
-        logger.info(f"📚 Found {len(results)} relevant chunks")
-        
-        # 🔹 Step 2: Build Context
-        # Every chunk already contains "Heading\n\nBody" so context is self-contained.
-        context = "\n\n---\n\n".join([r["text"] for r in results])
-        
-        # 🔹 Step 3: Generate answer
-        logger.info("⏳ Generating answer...")
-        answer = await generate_answer(request.query, context)
-        logger.info("✅ Answer generated")
-        
-        sources = [
-            Source(
-                text=r['text'][:200] + ("..." if len(r['text']) > 200 else ""),
-                source=f"{r['file']} - p.{r['page']}" if r.get('page') else str(r['file']),
-                similarity=f"{r['score']*100:.1f}%"
-            )
-            for r in results
-        ]
-        
-        return QueryResponse(
-            query=request.query,
-            answer=answer,
-            sources=sources,
-            resultsFound=len(results),
-            model=settings.LLM_MODEL,
-            embedding=settings.EMBEDDING_MODEL
-        )
-        
-    except Exception as e:
-        logger.error(f"Query error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/query-stream")
 async def query_stream(query: str = Query(...), model: Optional[str] = None):
@@ -144,3 +82,59 @@ async def query_stream(query: str = Query(...), model: Optional[str] = None):
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+@router.post("/query-structured")
+async def query_structured(request: QueryRequest):
+    """Wait for and return a structured JSON response."""
+    
+    if not request.query or not request.query.strip():
+        raise HTTPException(status_code=400, detail="Query is required")
+        
+    logger.info(f"\n Structured Query: \"{request.query}\"")
+    
+    try:
+        # Step 1: SEARCH QDRANT
+        results = query_qdrant(
+            query    = request.query,
+            client   = _qdrant_client,
+            embedder = _embedder,
+            top_k    = 8
+        )
+        
+        sources_payload = []
+        if results:
+            # Build context
+            context = "\n\n---\n\n".join([r["text"] for r in results])
+            
+            # Format Sources (Deduplicated for UI tags)
+            seen_sources = set()
+            for r in results:
+                source_label = f"{r['file']} - p.{r['page']}" if r.get('page') else str(r['file'])
+                if source_label not in seen_sources:
+                    sources_payload.append({
+                        "text":    r["text"][:200] + ("..." if len(r["text"]) > 200 else ""),
+                        "source":  source_label,
+                        "similarity": f"{r['score']*100:.1f}%"
+                    })
+                    seen_sources.add(source_label)
+        else:
+            context = "No relevant context found."
+
+        # Step 2: Generate Answer
+        logger.info(f"⏳ Generating structured answer (override=openrouter/free)...")
+        structured_data = await generate_answer_structured(
+            request.query, 
+            context,
+            model_override="openrouter/free"
+        )
+        
+        # We return the structured payload, plus the sources that the frontend expects
+        return JSONResponse(content={
+            "query": request.query,
+            "structuredPayload": structured_data,
+            "sources": sources_payload
+        })
+        
+    except Exception as e:
+        logger.error(f"Structured Query error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

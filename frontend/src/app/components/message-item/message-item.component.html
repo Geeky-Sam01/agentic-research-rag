@@ -43,7 +43,12 @@
       <!-- Content block -->
       <div class="pl-10 pr-4 overflow-hidden">
         <div class="msg-assistant text-text-primary prose-assistant">
-          <markdown [data]="message.content" />
+          @if (message.structuredPayload) {
+            <app-structured-response [data]="message.structuredPayload" />
+          } @else {
+            <markdown [data]="message.content" />
+          }
+
           @if (message.isStreaming) {
             <span class="stream-cursor"></span>
           }

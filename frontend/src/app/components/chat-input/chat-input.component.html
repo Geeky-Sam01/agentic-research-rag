@@ -38,9 +38,17 @@
           <button class="chip-icon" title="Attach file">
             <i class="pi pi-paperclip"></i>
           </button>
-          <button class="chip-pill">
+          <button class="chip-pill" title="Deep Search">
             <i class="pi pi-globe"></i>
             <span>Deep Search</span>
+          </button>
+          <button class="chip-pill" 
+                  [class.text-accent]="isStructuredMode"
+                  [class.border-accent]="isStructuredMode"
+                  (click)="toggleStructuredMode()"
+                  title="Toggle JSON Structured Outputs (Tables/Cards)">
+            <i class="pi pi-th-large"></i>
+            <span>{{ isStructuredMode ? 'Structured' : 'Markdown' }}</span>
           </button>
         </div>
 
@@ -99,6 +107,13 @@
             <i class="pi pi-globe text-base"></i>
           </button>
           
+          <button class="gsb-icon-btn" 
+                  [class.text-accent]="isStructuredMode" 
+                  (click)="toggleStructuredMode()"
+                  title="Toggle JSON Structured Outputs (Tables/Cards)">
+            <i class="pi pi-th-large text-base"></i>
+          </button>
+
           <div class="v-separator"></div>
 
           <!-- Model Select (Google Style Dropdown) -->

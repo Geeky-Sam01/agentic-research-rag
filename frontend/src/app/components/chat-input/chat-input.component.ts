@@ -15,11 +15,16 @@ import { ChatService } from '../../services/chat.service';
 })
 export class ChatInputComponent {
   @Input() isCentered = false;
-  @Output() send = new EventEmitter<string>();
+  @Output() send = new EventEmitter<{query: string, isStructured: boolean}>();
 
   chatService = inject(ChatService);
   inputValue = '';
   focused = signal(false);
+  isStructuredMode = false;
+
+  toggleStructuredMode(): void {
+    this.isStructuredMode = !this.isStructuredMode;
+  }
 
   get selectedModel(): string {
     return this.chatService.selectedModel();
@@ -52,7 +57,7 @@ export class ChatInputComponent {
   sendMessage(): void {
     const query = this.inputValue.trim();
     if (!query || this.chatService.loading()) return;
-    this.send.emit(query);
+    this.send.emit({ query, isStructured: this.isStructuredMode });
     this.inputValue = '';
   }
 }
