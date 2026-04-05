@@ -4,6 +4,7 @@ import { ChatPanelComponent } from '../chat-panel/chat-panel.component';
 import { RightPanelComponent } from '../right-panel/right-panel.component';
 import { UiStateService } from '../../services/ui-state.service';
 import { ChatService } from '../../services/chat.service';
+import { ChatHistoryService } from '../../services/chat-history.service';
 import { Toast } from 'primeng/toast';
 
 @Component({
@@ -21,6 +22,7 @@ import { Toast } from 'primeng/toast';
 export class AppShellComponent {
   uiState = inject(UiStateService);
   chatService = inject(ChatService);
+  historyService = inject(ChatHistoryService);
 
   @HostListener('window:keydown', ['$event'])
   handleKeyboardEvent(event: KeyboardEvent) {
@@ -40,5 +42,15 @@ export class AppShellComponent {
 
   newChat(): void {
     this.chatService.clearMessages();
+    this.historyService.createNewChat();
+  }
+
+  loadChat(id: string): void {
+    this.chatService.loadSession(id);
+  }
+
+  deleteChat(event: Event, id: string): void {
+    event.stopPropagation();
+    this.historyService.deleteSession(id);
   }
 }

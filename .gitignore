@@ -5,15 +5,28 @@ __pycache__/
 venv/
 .venv/
 .env
+backend/.python-version
 
 # Angular
 node_modules/
 dist/
 .angular/
+
+# IDE / OS
 .vscode/
+.idea/
+.DS_Store
+Thumbs.db
 
 # Vector DB / Local Files
 indices/
 uploads/
+backend/models/
+backend/qdrant_db/
 *.index
 metadata.json
+
+# Scratch Files
+memory.txt
+t.txt
+frontend/*.txt

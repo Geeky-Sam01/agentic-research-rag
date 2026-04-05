@@ -14,7 +14,7 @@ import { MessageService } from 'primeng/api';
   styleUrl: './left-panel.component.css'
 })
 export class LeftPanelComponent implements OnInit {
-  docService = inject(DocumentService);
+  public docService: DocumentService = inject(DocumentService);
   private messageService = inject(MessageService);
 
   ngOnInit(): void {
@@ -46,5 +46,28 @@ export class LeftPanelComponent implements OnInit {
     });
     // Reset input so same file can be re-uploaded
     input.value = '';
+  }
+
+  clearIndex(): void {
+    if (confirm('Are you sure you want to clear the entire knowledge base and all chat history? This action cannot be undone.')) {
+      this.docService.clearIndex().subscribe({
+        next: () => {
+          this.messageService.add({
+            severity: 'info',
+            summary: 'System Reset',
+            detail: 'Knowledge base and history purged successfully.',
+            life: 5000
+          });
+        },
+        error: (err) => {
+          this.messageService.add({
+            severity: 'error',
+            summary: 'Clear Failed',
+            detail: 'Could not purge the index.',
+            life: 5000
+          });
+        }
+      });
+    }
   }
 }

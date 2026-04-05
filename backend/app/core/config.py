@@ -1,8 +1,13 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict  # pyre-ignore[21]
 from pathlib import Path
 import os
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore"
+    )
+    
     # API Keys
     HF_TOKEN: str = ""
     OPENROUTER_API_KEY: str
@@ -24,8 +29,9 @@ class Settings(BaseSettings):
     EMBEDDING_DIM: int
     LLM_MODEL: str
     
-    class Config:
-        env_file = ".env"
+    # Qdrant
+    QUDRANT_API_KEY: str | None = None
+    QUDRANT_END_POINT: str | None = None
 
 settings = Settings()
 

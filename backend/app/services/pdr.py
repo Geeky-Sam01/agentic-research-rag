@@ -1,9 +1,23 @@
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any, TypedDict, Optional
+
+
+class ParentChunk(TypedDict):
+    id: str
+    page: Any
+    heading: str
+    text: str
+
+
+class ChildChunk(TypedDict):
+    text: str
+    parent_id: str
+    page: Any
+    heading: str
 
 
 def build_pdr_structure(
-    structured_chunks: List[Dict]
-) -> Tuple[List[Dict], List[Dict]]:
+    structured_chunks: List[Dict[str, Any]]
+) -> Tuple[List[ParentChunk], List[ChildChunk]]:
     """
     Builds Parent Document Retrieval structure from structured chunks.
 
@@ -36,44 +50,41 @@ def build_pdr_structure(
     ]
     """
 
-    parent_map = {}
-    parent_chunks = []
-    child_chunks = []
+    parent_map: Dict[str, str] = {}
+    parent_chunks: List[ParentChunk] = []
+    child_chunks: List[ChildChunk] = []
 
-    parent_id_counter = 0
 
     for chunk in structured_chunks:
         page = chunk.get("page")
-        heading = chunk.get("heading", "General")
-        text = chunk.get("text", "")
+        heading = str(chunk.get("heading") or "General")
+        text_str: str = str(chunk.get("text") or "")
 
         # Unique parent key
         key = f"{page}_{heading}"
 
         if key not in parent_map:
-            parent_id = f"parent_{parent_id_counter}"
-            parent_map[key] = parent_id
+            p_id = f"parent_{len(parent_chunks)}"
+            parent_map[key] = p_id
 
             parent_chunks.append({
-                "id": parent_id,
+                "id": p_id,
                 "page": page,
                 "heading": heading,
-                "text": text
+                "text": text_str
             })
-
-            parent_id_counter += 1
         else:
             # Append text to existing parent
-            parent_id = parent_map[key]
+            p_id = parent_map[key]
 
             for p in parent_chunks:
-                if p["id"] == parent_id:
-                    p["text"] += "\n" + text
+                if p["id"] == p_id:
+                    p["text"] = p["text"] + "\n" + text_str
                     break
 
         # Always create child chunk
         child_chunks.append({
-            "text": text,
+            "text": text_str,
             "parent_id": parent_map[key],
             "page": page,
             "heading": heading

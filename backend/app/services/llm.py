@@ -2,7 +2,7 @@ import httpx
 import json
 import logging
 from app.core.config import settings
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 from app.services.prompts import RAG_SYSTEM_PROMPT, RAG_USER_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -50,52 +50,83 @@ async def generate_answer(query: str, context: str) -> str:
         logger.error(f"LLM error: {str(e)}")
         raise
 
-async def generate_answer_stream(query: str, context: str) -> AsyncGenerator[str, None]:
-    """Generate answer using OpenRouter with streaming."""
-    
+async def generate_answer_stream(query: str, context: str, model_override: Optional[str] = None) -> AsyncGenerator[str, None]:
+    """Generate answer using OpenRouter with streaming. Automatically falls back on 429."""
+
     system_prompt = RAG_SYSTEM_PROMPT
-    
     user_prompt = RAG_USER_PROMPT.format(context=context, query=query)
     
-    try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            async with client.stream(
-                "POST",
-                OPENROUTER_API_URL,
-                json={
-                    "model": settings.LLM_MODEL,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    "max_tokens": 1024,
-                    "temperature": 0.3,
-                    "top_p": 0.9,
-                    "stream": True
-                },
-                headers={
-                    "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "http://localhost:4200",
-                    "X-OpenRouter-Title": "Agentic RAG"
-                }
-            ) as response:
-                
-                if response.status_code != 200:
-                    logger.error(f"OpenRouter stream error: {await response.atext()}")
-                    raise Exception(f"LLM streaming error: {response.status_code}")
-                
-                async for line in response.aiter_lines():
-                    if line.startswith("data:"):
-                        data_str = line[5:].strip()
-                        if data_str and data_str != "[DONE]":
-                            try:
-                                data = json.loads(data_str)
-                                if data.get('choices') and data['choices'][0].get('delta', {}).get('content'):
-                                    yield data['choices'][0]['delta']['content']
-                            except json.JSONDecodeError:
-                                continue
+    # List of models to try in order if 429 occurs
+    # Prioritize user-selected model from override, then default, then fallbacks
+    primary_model = model_override if model_override else settings.LLM_MODEL
+    
+    models_to_try = [
+        primary_model,
+        "qwen/qwen-turbo:free",
+        "nvidia/nemotron-4-340b-instruct:free",
+        "minimax/minimax-01:free",
+        "google/gemma-2-9b-it:free"
+    ]
+
+    for i, model_name in enumerate(models_to_try):
+        try:
+            if i > 0:
+                logger.info(f"🔄 Switching to fallback model: {model_name}")
+                yield f"\n\n> ⚠️ **Free LLM quota exceeded.** Switching to fallback model: `{model_name}`\n> *(Note: Context might be partially lost during switch)*\n\n"
+
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                async with client.stream(
+                    "POST",
+                    OPENROUTER_API_URL,
+                    json={
+                        "model": model_name,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt}
+                        ],
+                        "max_tokens": 1024,
+                        "temperature": 0.3,
+                        "top_p": 0.9,
+                        "stream": True
+                    },
+                    headers={
+                        "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "http://localhost:4200",
+                        "X-OpenRouter-Title": "Agentic RAG"
+                    }
+                ) as response:
                     
-    except Exception as e:
-        logger.error(f"LLM streaming error: {str(e)}")
-        raise
+                    if response.status_code == 429:
+                        if i < len(models_to_try) - 1:
+                            logger.warning(f"429 for {model_name}, trying next fallback...")
+                            continue # Try next model!
+                        else:
+                            yield "ERROR: All available free model quotas exceeded. Please try again in 1 minute."
+                            return
+
+                    if response.status_code != 200:
+                        content = await response.aread()
+                        logger.error(f"OpenRouter stream error ({response.status_code}): {content.decode()}")
+                        yield f"ERROR: LLM API returned status {response.status_code}"
+                        return
+                    
+                    async for line in response.aiter_lines():
+                        if line.startswith("data:"):
+                            data_str = line[5:].strip()
+                            if data_str and data_str != "[DONE]":
+                                try:
+                                    data = json.loads(data_str)
+                                    if data.get('choices') and data['choices'][0].get('delta', {}).get('content'):
+                                        yield data['choices'][0]['delta']['content']
+                                except json.JSONDecodeError:
+                                    continue
+                    return # Success!
+
+        except Exception as e:
+            logger.error(f"LLM streaming error with {model_name}: {str(e)}")
+            if i == len(models_to_try) - 1:
+                yield f"ERROR: Connection failed after multiple attempts: {str(e)}"
+                raise
+            continue # Try next if connection failed
+

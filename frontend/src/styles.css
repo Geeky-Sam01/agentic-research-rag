@@ -29,7 +29,9 @@
 /* ── CSS Reset ─────────────────────────────── */
 
 /* 1. Use a more-intuitive box-sizing model */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -58,18 +60,31 @@ body {
 }
 
 /* 6. Improve media defaults */
-img, picture, video, canvas, svg {
+img,
+picture,
+video,
+canvas,
+svg {
   display: block;
   max-width: 100%;
 }
 
 /* 7. Inherit fonts for form controls */
-input, button, textarea, select {
+input,
+button,
+textarea,
+select {
   font: inherit;
 }
 
 /* 8. Avoid text overflows */
-p, h1, h2, h3, h4, h5, h6 {
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   overflow-wrap: break-word;
 }
 
@@ -77,7 +92,13 @@ p, h1, h2, h3, h4, h5, h6 {
 p {
   text-wrap: pretty;
 }
-h1, h2, h3, h4, h5, h6 {
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   text-wrap: balance;
 }
 
@@ -93,13 +114,16 @@ app-root {
   width: 4px;
   height: 4px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: var(--color-border-soft);
   border-radius: 4px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-muted);
 }
@@ -109,15 +133,37 @@ app-root {
   box-shadow: 0 0 0 1px var(--color-accent), 0 0 12px var(--color-accent-glow);
 }
 
-.text-primary { color: var(--color-text-primary); }
-.text-secondary { color: var(--color-text-secondary); }
-.text-muted { color: var(--color-text-muted); }
-.text-accent { color: var(--color-accent); }
+.text-primary {
+  color: var(--color-text-primary);
+}
 
-.bg-main { background-color: var(--color-bg-main); }
-.bg-soft { background-color: var(--color-bg-soft); }
-.bg-panel { background-color: var(--color-panel); }
-.border-main { border-color: var(--color-border); }
+.text-secondary {
+  color: var(--color-text-secondary);
+}
+
+.text-muted {
+  color: var(--color-text-muted);
+}
+
+.text-accent {
+  color: var(--color-accent);
+}
+
+.bg-main {
+  background-color: var(--color-bg-main);
+}
+
+.bg-soft {
+  background-color: var(--color-bg-soft);
+}
+
+.bg-panel {
+  background-color: var(--color-panel);
+}
+
+.border-main {
+  border-color: var(--color-border);
+}
 
 /* ── PrimeNG Overrides (New Style Guide) ─────── */
 .p-button {
@@ -192,7 +238,7 @@ textarea.p-textarea:focus,
   padding: 10px 16px;
   max-width: 80%;
   color: var(--color-text-primary);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .msg-assistant {
@@ -223,18 +269,37 @@ textarea.p-textarea:focus,
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0;
+  }
 }
 
 /* ── Loading Spinner Override ───────────────── */
@@ -263,9 +328,17 @@ app-message-item .msg-assistant markdown p {
   margin-bottom: 0.5em;
 }
 
-.prose-assistant markdown h1 { font-size: 1.4em; }
-.prose-assistant markdown h2 { font-size: 1.2em; }
-.prose-assistant markdown h3 { font-size: 1.05em; }
+.prose-assistant markdown h1 {
+  font-size: 1.4em;
+}
+
+.prose-assistant markdown h2 {
+  font-size: 1.2em;
+}
+
+.prose-assistant markdown h3 {
+  font-size: 1.05em;
+}
 
 .prose-assistant markdown ul,
 .prose-assistant markdown ol {
@@ -273,8 +346,13 @@ app-message-item .msg-assistant markdown p {
   margin-bottom: 0.75em;
 }
 
-.prose-assistant markdown ul { list-style-type: disc; }
-.prose-assistant markdown ol { list-style-type: decimal; }
+.prose-assistant markdown ul {
+  list-style-type: disc;
+}
+
+.prose-assistant markdown ol {
+  list-style-type: decimal;
+}
 
 .prose-assistant markdown li {
   margin-bottom: 0.3em;
@@ -364,4 +442,79 @@ app-message-item .msg-assistant markdown p {
   background: var(--color-panel);
   color: var(--color-accent);
   font-weight: 700;
+}
+
+/* ── PrimeNG Select (v21) Dark Styling ──────────────── */
+.p-select {
+  background: var(--color-bg-soft) !important;
+  border: 1px solid var(--color-border-soft) !important;
+  border-radius: 20px !important;
+  transition: all 0.2s ease !important;
+  min-height: 32px !important;
+  width: auto !important;
+}
+
+.p-select:hover {
+  border-color: var(--color-accent) !important;
+  background: var(--color-accent-soft) !important;
+}
+
+.p-select-label {
+  color: var(--color-text-primary) !important;
+  font-size: 13px !important;
+  padding: 4px 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  font-weight: 500 !important;
+}
+
+.p-select-dropdown {
+  color: var(--color-text-muted) !important;
+  width: 2.5rem !important;
+}
+
+/* The Overlay Panel */
+.p-select-panel {
+  background: var(--color-panel) !important;
+  border: 1px solid var(--color-border) !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6) !important;
+  border-radius: 12px !important;
+  padding: 4px !important;
+  margin-top: 4px !important;
+}
+
+.p-select-list-container {
+  background: transparent !important;
+}
+
+.p-select-list {
+  padding: 0 !important;
+}
+
+.p-select-option {
+  color: var(--color-text-secondary) !important;
+  font-size: 13px !important;
+  padding: 8px 12px !important;
+  border-radius: 8px !important;
+  margin-bottom: 2px !important;
+  transition: all 0.15s ease !important;
+}
+
+.p-select-option:last-child {
+  margin-bottom: 0 !important;
+}
+
+.p-select-option.p-select-option-selected {
+  background: var(--color-accent-soft) !important;
+  color: var(--color-accent) !important;
+}
+
+.p-select-option:not(.p-select-option-selected):not(.p-disabled).p-focus {
+  background: var(--color-border-soft) !important;
+  color: var(--color-text-primary) !important;
+}
+
+.p-select-option:hover:not(.p-select-option-selected) {
+  background: var(--color-border-soft) !important;
+  color: var(--color-text-primary) !important;
 }

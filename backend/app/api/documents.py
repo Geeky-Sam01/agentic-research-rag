@@ -1,120 +1,116 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException  # type: ignore
 import logging
 from pathlib import Path
 
-from app.core.config import settings
-from app.services.embeddings import get_embeddings, get_cache_stats
-from app.services.faiss_service import faiss_manager
-from app.services.document_processor import extract_text_from_file, chunk_structured_document
-from app.services.pdr import build_pdr_structure
-from app.models.schemas import DocumentUploadResponse
+from app.core.config import settings  # type: ignore
+from app.services.embeddings import get_embeddings, get_cache_stats, model as _embedder  # type: ignore
+from app.services.document_processor import extract_text_from_file, chunk_structured_document  # type: ignore
+from app.models.schemas import DocumentUploadResponse  # type: ignore
+from app.services.injest import (  # type: ignore
+    get_client, ensure_collection, ingest_file, delete_document, 
+    get_collection_stats, clear_collection
+)
+from sentence_transformers import SentenceTransformer  # type: ignore
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
 
-@router.post("/upload")
-async def upload_document(file: UploadFile = File(...)) -> DocumentUploadResponse:
-    """Upload and index a document using Parent Document Retrieval."""
+# ── Shared clients (initialised once at import time) ─────────────────────────
+_qdrant_client = get_client()
+# _embedder is now imported from embeddings service
+ 
+ensure_collection(_qdrant_client)
+ 
+ 
 
+@router.post("/upload", response_model=DocumentUploadResponse)
+async def upload_document(
+    file:      UploadFile = File(...),
+    fund_name: str        = Form("Unknown Fund"),                          # "Parag Parikh Flexi Cap Fund"
+    doc_type:  str        = Form("other"),                  # "factsheet" | "annual_report" | "other"
+    period:    str        = Form("Unknown Period"),                          # "2025-01"  or  "2025"
+    overwrite: bool       = Form(False),                        # delete existing points first
+) -> DocumentUploadResponse:
+    """
+    Upload and index a financial document (PDF or TXT) into Qdrant.
+ 
+    Form fields
+    -----------
+    fund_name   Fund this document belongs to.
+    doc_type    "factsheet" | "annual_report" | "other"
+    period      Month/year string: "2025-01" for a January factsheet,
+                "2025" for an annual report.
+    overwrite   If True, existing Qdrant points for this filename are
+                deleted before ingestion (safe re-upload).
+    """
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
-
-    logger.info(f"\n📄 Processing file: {file.filename}")
-
+ 
+    logger.info(f"📄 Received: {file.filename}  [{doc_type} / {fund_name} / {period}]")
+ 
     file_path = Path(settings.UPLOAD_PATH) / file.filename
-
+ 
     try:
+        # ── 1. Save upload to disk ────────────────────────────────────────
         content = await file.read()
-
+        logger.debug(f"Saving {len(content)} bytes to {file_path}")
         with open(file_path, "wb") as f:
-            f.write(content)
-
-        # ---------------- OCR EXTRACTION ---------------- #
-        logger.info("📖 Extracting structured document...")
-
-        document = extract_text_from_file(str(file_path))
-
-        if not document or len(document) == 0:
-            raise HTTPException(status_code=400, detail="Could not extract text from file")
-
-        # ---------------- CHUNKING ---------------- #
-        logger.info("✂️ Creating structured chunks...")
-
-        structured_chunks = chunk_structured_document(document)
-
-        if not structured_chunks:
-            raise HTTPException(status_code=400, detail="No chunks created from document")
-
-        logger.info(f"📚 Total chunks: {len(structured_chunks)}")
-
-        # ---------------- PDR ---------------- #
-        logger.info("🧠 Building Parent Document Retrieval structure...")
-
-        parent_chunks, child_chunks = build_pdr_structure(structured_chunks)
-
-        logger.info(f"📦 Parent sections: {len(parent_chunks)}")
-        logger.info(f"📚 Child chunks: {len(child_chunks)}")
-
-        # ---------------- EMBEDDINGS ---------------- #
-        child_texts = [c["text"] for c in child_chunks]
-
-        logger.info("🔢 Generating embeddings...")
-
-        embeddings = await get_embeddings(child_texts)
-
-        logger.info(f"✅ Generated {len(embeddings)} embeddings")
-
-        # ---------------- METADATA ---------------- #
-        logger.info("💾 Preparing metadata...")
-
-        metadata = [
-            {
-                "parent_id": c["parent_id"],
-                "filename": file.filename,
-                "page": c.get("page"),
-                "heading": c.get("heading")
-            }
-            for c in child_chunks
-        ]
-
-        # ---------------- FAISS ---------------- #
-        logger.info("💾 Adding to FAISS index...")
-
-        total_indexed = faiss_manager.add_vectors(
-            embeddings,
-            child_texts,
-            metadata,
-            parent_chunks
+            f.write(content)  # type: ignore
+        logger.info(f"Successfully saved {file.filename} to disk.")
+ 
+        # ── 2. Optionally clear previous version ──────────────────────────
+        if overwrite:
+            logger.info(f"🗑️  Overwrite=True — deleting existing points for {file.filename}")
+            delete_document(file.filename, _qdrant_client)
+ 
+        # ── 3. Run the full ingest pipeline ───────────────────────────────
+        #       extract → chunk (+metadata) → embed → upsert
+        logger.info("🚀 Running ingest pipeline...")
+ 
+        total_indexed = ingest_file(
+            file_path = str(file_path),
+            fund_name = fund_name,
+            doc_type  = doc_type,
+            period    = period,
+            client    = _qdrant_client,
+            embedder  = _embedder,
         )
-
-        logger.info(f"✨ Done! Total vectors indexed: {total_indexed}")
-
+ 
+        if total_indexed == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="No content could be extracted or indexed from the file.",
+            )
+ 
+        logger.info(f"✅ Indexed {total_indexed} chunks from {file.filename}")
+ 
         return DocumentUploadResponse(
-            success=True,
-            message=f"Indexed {len(child_chunks)} chunks from {file.filename}",
-            totalIndexed=total_indexed,
-            chunksCreated=len(child_chunks),
-            embeddingModel=settings.EMBEDDING_MODEL,
-            embeddingDimension=settings.EMBEDDING_DIM
+            success            = True,
+            message            = f"Indexed {total_indexed} chunks from {file.filename}",
+            totalIndexed       = total_indexed,
+            chunksCreated      = total_indexed,
+            embeddingModel     = settings.EMBEDDING_MODEL,
+            embeddingDimension = settings.EMBEDDING_DIM,
         )
-
+ 
     except HTTPException:
         raise
-
+ 
     except Exception as e:
-        logger.error(f"Upload error: {e}")
+        logger.error(f"Upload error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
-
+ 
     finally:
+        # Always clean up the temp file
         if file_path.exists():
+            logger.debug(f"Cleaning up temporary file: {file_path}")
             file_path.unlink()
-
 @router.get("/stats")
 async def get_stats():
-    """Get knowledge base statistics."""
+    """Get knowledge base statistics from Qdrant."""
     try:
-        stats = faiss_manager.get_stats()
+        stats = get_collection_stats(_qdrant_client)
         cache_stats = get_cache_stats()
 
         return {
@@ -129,14 +125,14 @@ async def get_stats():
 
 @router.delete("/clear")
 async def clear_index():
-    """Clear the FAISS index."""
+    """Clear the Qdrant collection."""
     try:
-        success = faiss_manager.clear()
+        success = clear_collection(_qdrant_client)
 
         if success:
-            return {"success": True, "message": "Index cleared"}
+            return {"success": True, "message": "Collection cleared"}
 
-        raise HTTPException(status_code=500, detail="Failed to clear index")
+        raise HTTPException(status_code=500, detail="Failed to clear collection")
 
     except Exception as e:
         logger.error(f"Clear error: {e}")

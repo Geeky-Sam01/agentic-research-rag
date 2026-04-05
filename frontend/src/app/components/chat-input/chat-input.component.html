@@ -7,7 +7,7 @@
 
       <!-- Textarea row -->
       <div class="centered-textarea-row">
-        <textarea pTextarea
+        <textarea pInputTextarea
           [(ngModel)]="inputValue"
           [autoResize]="true"
           [rows]="1"
@@ -26,19 +26,21 @@
       <div class="centered-actions">
         <!-- Left: action chips -->
         <div class="centered-chips">
+          <p-select [options]="models" 
+                   [(ngModel)]="selectedModel" 
+                   optionLabel="label" 
+                   optionValue="value"
+                   class="model-select"
+                   [appendTo]="'body'"
+                   title="Select AI Model">
+          </p-select>
+          <div class="v-divider"></div>
           <button class="chip-icon" title="Attach file">
             <i class="pi pi-paperclip"></i>
           </button>
           <button class="chip-pill">
             <i class="pi pi-globe"></i>
             <span>Deep Search</span>
-          </button>
-          <button class="chip-pill">
-            <i class="pi pi-lightbulb"></i>
-            <span>Reason</span>
-          </button>
-          <button class="chip-icon" title="More options">
-            <i class="pi pi-ellipsis-h"></i>
           </button>
         </div>
 
@@ -67,18 +69,23 @@
 @if (!isCentered) {
   <div class="bottom-wrapper">
     <div class="bottom-inner">
-      <div class="bottom-container"
+      <div class="google-search-bar"
            [class.active-focus]="focused()"
            [class.border-accent]="focused()">
+        
+        <!-- Left Addition (+ Icon style) -->
+        <button class="gsb-plus" title="Add file">
+          <i class="pi pi-plus text-sm"></i>
+        </button>
 
-        <!-- Textarea -->
-        <textarea pTextarea
+        <!-- Main Textarea -->
+        <textarea pInputTextarea
           [(ngModel)]="inputValue"
           [autoResize]="true"
           [rows]="1"
           [disabled]="chatService.loading()"
-          placeholder="Press Enter to search documents"
-          class="bottom-textarea"
+          placeholder="Ask anything..."
+          class="gsb-textarea"
           spellcheck="false"
           autocomplete="off"
           (focus)="focused.set(true)"
@@ -86,17 +93,35 @@
           (keydown)="onKeydown($event)"
         ></textarea>
 
-        <!-- Send button -->
-        <button class="bottom-send"
-                [class.can-send]="canSend()"
-                [disabled]="!canSend()"
-                (click)="sendMessage()">
-          @if (chatService.loading()) {
-            <i class="pi pi-spin pi-spinner text-sm"></i>
-          } @else {
-            <i class="pi pi-send text-sm"></i>
-          }
-        </button>
+        <!-- Right Icons Group -->
+        <div class="gsb-actions">
+          <button class="gsb-icon-btn" title="Deep Search">
+            <i class="pi pi-globe text-base"></i>
+          </button>
+          
+          <div class="v-separator"></div>
+
+          <!-- Model Select (Google Style Dropdown) -->
+          <p-select [options]="models" 
+                   [(ngModel)]="selectedModel" 
+                   optionLabel="label" 
+                   optionValue="value"
+                   class="gsb-model-select"
+                   [appendTo]="'body'">
+          </p-select>
+
+          <!-- Integrated Send Button -->
+          <button class="gsb-send"
+                  [class.can-send]="canSend()"
+                  [disabled]="!canSend()"
+                  (click)="sendMessage()">
+            @if (chatService.loading()) {
+              <i class="pi pi-spin pi-spinner text-sm"></i>
+            } @else {
+              <i class="pi pi-send text-sm"></i>
+            }
+          </button>
+        </div>
       </div>
 
       <!-- Hints -->

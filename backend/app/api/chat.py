@@ -1,16 +1,24 @@
-from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, HTTPException, Query  # type: ignore
+from fastapi.responses import StreamingResponse  # type: ignore
 import logging
 import json
+from typing import Optional
+from sentence_transformers import SentenceTransformer  # type: ignore
 
-from app.core.config import settings
-from app.services.embeddings import get_embedding
-from app.services.faiss_service import faiss_manager
-from app.services.llm import generate_answer, generate_answer_stream
-from app.models.schemas import QueryRequest, QueryResponse, Source
+from app.core.config import settings  # type: ignore
+from app.services.injest import get_client, query_qdrant  # type: ignore
+from app.services.embeddings import model as _embedder  # type: ignore
+from app.services.llm import generate_answer, generate_answer_stream  # type: ignore
+from app.models.schemas import QueryRequest, QueryResponse, Source  # type: ignore
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["chat"])
+
+
+# ── Shared clients (initialised once at import time) ─────────────────────────
+_qdrant_client = get_client()
+# _embedder is now imported from embeddings service
+
 
 @router.post("/query")
 async def query(request: QueryRequest) -> QueryResponse:
@@ -22,18 +30,19 @@ async def query(request: QueryRequest) -> QueryResponse:
     logger.info(f"\n🔍 Query: \"{request.query}\"")
     
     try:
-        # Get query embedding
-        query_embedding = await get_embedding(request.query)
-        logger.info("✅ Generated query embedding")
-        
-        # Search FAISS
-        results = faiss_manager.search(query_embedding, k=5)
+        # 🔹 Step 1: Search Qdrant
+        results = query_qdrant(
+            query    = request.query,
+            client   = _qdrant_client,
+            embedder = _embedder,
+            top_k    = 5
+        )
         
         if not results:
             logger.info("⚠️ No relevant documents found")
             return QueryResponse(
                 query=request.query,
-                answer="I could not find any relevant documents to answer this question. Please upload documents first and ask questions about their content.",
+                answer="I could not find any relevant documents in the knowledge base. Please upload documents first.",
                 sources=[],
                 resultsFound=0,
                 model=settings.LLM_MODEL,
@@ -42,31 +51,20 @@ async def query(request: QueryRequest) -> QueryResponse:
         
         logger.info(f"📚 Found {len(results)} relevant chunks")
         
-        # Build context using PDR
-        context_parts = []
-        for r in results:
-            doc = r['document']
-            parent_text = faiss_manager.get_parent_text(doc['source'], doc.get('parent_id'))
-            
-            # Use parent text if available, otherwise fallback to child chunk
-            text_to_use = parent_text if parent_text else doc['text']
-            context_parts.append(
-                f"[Document: {doc['source']} - Similarity: {r['similarity']*100:.1f}%]\n{text_to_use}"
-            )
-            
-        context = "\n\n---\n\n".join(context_parts)
+        # 🔹 Step 2: Build Context
+        # Every chunk already contains "Heading\n\nBody" so context is self-contained.
+        context = "\n\n---\n\n".join([r["text"] for r in results])
         
-        # Generate answer
+        # 🔹 Step 3: Generate answer
         logger.info("⏳ Generating answer...")
         answer = await generate_answer(request.query, context)
-        
         logger.info("✅ Answer generated")
         
         sources = [
             Source(
-                text=r['document']['text'][:150] + "...",
-                source=r['document']['source'],
-                similarity=f"{r['similarity']*100:.1f}%"
+                text=r['text'][:200] + ("..." if len(r['text']) > 200 else ""),
+                source=f"{r['file']} - p.{r['page']}" if r.get('page') else str(r['file']),
+                similarity=f"{r['score']*100:.1f}%"
             )
             for r in results
         ]
@@ -85,7 +83,7 @@ async def query(request: QueryRequest) -> QueryResponse:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/query-stream")
-async def query_stream(query: str = Query(...)):
+async def query_stream(query: str = Query(...), model: Optional[str] = None):
     """Stream query response with proper PDR context."""
 
     if not query or not query.strip():
@@ -95,61 +93,47 @@ async def query_stream(query: str = Query(...)):
 
     async def event_generator():
         try:
-            # 🔹 Step 1: Embed query
-            query_embedding = await get_embedding(query)
-            logger.info("✅ Generated query embedding")
-
-            # 🔹 Step 2: Retrieve (increase depth)
-            results = faiss_manager.search(query_embedding, k=20)
+            # 🔹 Step 1: SEARCH QDRANT
+            results = query_qdrant(
+                query    = query,
+                client   = _qdrant_client,
+                embedder = _embedder,
+                top_k    = 8
+            )
 
             if not results:
-                yield f"data: {json.dumps({'content': 'No relevant documents found. Please upload documents first.'})}\n\n"
+                yield f"data: {json.dumps({'content': 'No relevant documents found.'})}\n\n"
                 return
 
             logger.info(f"📚 Found {len(results)} relevant chunks")
 
-            # 🔹 Step 3: Build CLEAN PDR context (IMPORTANT FIX)
-            context = faiss_manager.build_context(results)
-            logger.info(f" Final Context:\n{context[:500]}...")
+            # 🔹 Step 2: Build context
+            context = "\n\n---\n\n".join([r["text"] for r in results])
 
-            # 🔹 Step 4: Deduplicated parent-level sources
-            seen_parents = set()
+            # 🔹 Step 3: Format Sources (Deduplicated for UI tags)
             sources_payload = []
-
+            seen_sources = set()
             for r in results:
-                doc = r["document"]
-                parent_id = doc.get("parent_id")
-
-                if parent_id in seen_parents:
-                    continue
-
-                seen_parents.add(parent_id)
-
-                parent_text = faiss_manager.get_parent_text(
-                    doc["source"], parent_id
-                )
-
-                preview = parent_text if parent_text else doc["text"]
-
-                source_name = doc["source"]
-                if doc.get("page"):
-                    source_name += f" - p.{doc['page']}"
-
-                sources_payload.append({
-                    "id": r["id"],
-                    "text": preview[:200] + ("..." if len(preview) > 200 else ""),
-                    "source": source_name,
-                    "similarity": f"{r['similarity']*100:.1f}%"
-                })
+                source_label = f"{r['file']} - p.{r['page']}" if r.get('page') else str(r['file'])
+                
+                # We still want to show the full list of chunks in the evidence panel if needed,
+                # but for the citations list (sources_payload), deduplication is better.
+                if source_label not in seen_sources:
+                    sources_payload.append({
+                        "text":    r["text"][:200] + ("..." if len(r["text"]) > 200 else ""),
+                        "source":  source_label,
+                        "similarity": f"{r['score']*100:.1f}%"
+                    })
+                    seen_sources.add(source_label)
 
             # 🔹 Step 5: Emit sources first
             yield f"data: {json.dumps({'type': 'sources', 'sources': sources_payload})}\n\n"
-            logger.info(f" Emitted sources: {len(sources_payload)} items")
+            logger.info(f" Emitted deduplicated sources: {len(sources_payload)} items")
 
-            # 🔹 Step 6: Stream answer using CLEAN context
-            logger.info("⏳ Streaming answer...")
+            # 🔹 Step 6: Stream answer using CLEAN context and optional model override
+            logger.info(f"⏳ Streaming answer (override={model})...")
 
-            async for chunk in generate_answer_stream(query, context):
+            async for chunk in generate_answer_stream(query, context, model_override=model):
                 yield f"data: {json.dumps({'content': chunk})}\n\n"
 
             yield f"data: {json.dumps({'content': '[DONE]'})}\n\n"

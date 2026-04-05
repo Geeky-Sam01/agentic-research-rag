@@ -21,3 +21,19 @@
   border-color: rgba(255, 122, 26, 0.4);
   color: var(--color-text-primary);
 }
+
+@keyframes toast-in {
+  from {
+    transform: translate(-50%, 20px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+

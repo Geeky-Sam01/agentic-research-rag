@@ -2,6 +2,7 @@ import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Message, Chunk, Source } from '../models/chat.models';
 import { DocumentService } from './document.service';
+import { ChatHistoryService } from './chat-history.service';
 
 @Injectable({ providedIn: 'root' })
 export class ChatService {
@@ -11,14 +12,21 @@ export class ChatService {
   selectedChunkId = signal<string | null>(null);
   status = signal<string | null>(null);
   statusHistory = signal<string[]>([]);
+  selectedModel = signal<string>('openrouter/free');
 
   private http = inject(HttpClient);
   private docService = inject(DocumentService);
+  private historyService = inject(ChatHistoryService);
   private eventSource: EventSource | null = null;
   private readonly BASE_URL = 'http://localhost:8000';
 
-  sendQuery(query: string): void {
+  async sendQuery(query: string) {
     this.closeStream();
+
+    // Ensure we have a session
+    if (!this.historyService.currentSessionId()) {
+      await this.historyService.createNewChat();
+    }
 
     // Push user message
     const userMsg: Message = {
@@ -41,13 +49,13 @@ export class ChatService {
     this.messages.update((msgs: Message[]) => [...msgs, assistantMsg]);
     this.loading.set(true);
 
-    if (this.docService.sources().length > 0) {
+    if (this.docService.currentSources().length > 0) {
       this.status.set('Searching documents...');
       this.statusHistory.set(['Searching documents...']);
     }
 
-    // Open SSE stream
-    const url = `${this.BASE_URL}/api/chat/query-stream?query=${encodeURIComponent(query)}`;
+    // Open SSE stream avec model selection
+    const url = `${this.BASE_URL}/api/chat/query-stream?query=${encodeURIComponent(query)}&model=${this.selectedModel()}`;
     this.eventSource = new EventSource(url);
 
     this.eventSource.onmessage = (event) => {
@@ -74,7 +82,7 @@ export class ChatService {
             m.id === assistantId ? { ...m, citations } : m
           ));
           
-          if (this.docService.sources().length > 0) {
+          if (this.docService.currentSources().length > 0) {
             const msg = `Retrieved ${data.sources.length} relevant sections`;
             this.status.set(msg);
             this.statusHistory.update((prev: string[]) => [...prev, msg]);
@@ -111,6 +119,11 @@ export class ChatService {
 
         // Append streamed content
         if (data.content) {
+          // Detected error or switch event in the content stream
+          if (data.content.includes('⚠️') || data.content.startsWith('ERROR:')) {
+             this.docService.showToast(data.content.replace('ERROR:', '').split('\n')[0]);
+          }
+
           // Once content starts, clear status
           this.status.set(null);
           // (keep statusHistory for current message display)
@@ -140,6 +153,9 @@ export class ChatService {
     this.messages.update((msgs: Message[]) => msgs.map((m: Message) =>
       m.id === assistantId ? { ...m, isStreaming: false } : m
     ));
+
+    // Persist to history
+    this.historyService.updateCurrentSession(this.messages(), this.chunks());
   }
 
   private closeStream(): void {
@@ -160,5 +176,18 @@ export class ChatService {
     this.selectedChunkId.set(null);
     this.loading.set(false);
     this.statusHistory.set([]);
+    this.historyService.currentSessionId.set(null);
+  }
+
+  async loadSession(id: string) {
+    const session = await this.historyService.getSession(id);
+    if (session) {
+      this.closeStream();
+      this.messages.set(session.messages || []);
+      this.chunks.set(session.chunks || []);
+      this.selectedChunkId.set(null);
+      this.loading.set(false);
+      this.historyService.currentSessionId.set(id);
+    }
   }
 }

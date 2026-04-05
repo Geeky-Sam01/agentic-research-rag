@@ -1,42 +1,50 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap, catchError, throwError } from 'rxjs';
+import { ChatHistoryService } from './chat-history.service';
 
 export type UploadStatus = 'idle' | 'uploading' | 'done' | 'error';
 
 @Injectable({ providedIn: 'root' })
 export class DocumentService {
-  sources = signal<string[]>([]);
-  uploadStatus = signal<UploadStatus>('idle');
-  totalVectors = signal<number>(0);
+  public currentSources = signal<string[]>([]);
+  public indexingState = signal<UploadStatus>('idle');
+  public vectorStats = signal<number>(0);
+  public toastMessage = signal<string | null>(null);
 
   private http = inject(HttpClient);
+  private historyService = inject(ChatHistoryService);
   private readonly BASE_URL = 'http://localhost:8000';
+
+  showToast(msg: string) {
+    this.toastMessage.set(msg);
+    setTimeout(() => this.toastMessage.set(null), 5000);
+  }
 
   fetchStats(): void {
     this.http.get<any>(`${this.BASE_URL}/api/documents/stats`).subscribe({
       next: (data) => {
-        this.sources.set(data.sources || []);
-        this.totalVectors.set(data.vectors || data.totalVectors || 0);
+        this.currentSources.set(data.sources || []);
+        this.vectorStats.set(data.vectors || data.totalVectors || 0);
       },
       error: (err) => console.error('Stats fetch failed:', err)
     });
   }
 
   uploadDocument(file: File): Observable<any> {
-    this.uploadStatus.set('uploading');
+    this.indexingState.set('uploading');
     const formData = new FormData();
     formData.append('file', file);
 
     return this.http.post<any>(`${this.BASE_URL}/api/documents/upload`, formData).pipe(
       tap(() => {
-        this.uploadStatus.set('done');
+        this.indexingState.set('done');
         this.fetchStats();
-        setTimeout(() => this.uploadStatus.set('idle'), 3000);
+        setTimeout(() => this.indexingState.set('idle'), 3000);
       }),
       catchError(err => {
-        this.uploadStatus.set('error');
-        setTimeout(() => this.uploadStatus.set('idle'), 3000);
+        this.indexingState.set('error');
+        setTimeout(() => this.indexingState.set('idle'), 3000);
         return throwError(() => err);
       })
     );
@@ -45,8 +53,9 @@ export class DocumentService {
   clearIndex(): Observable<any> {
     return this.http.delete<any>(`${this.BASE_URL}/api/documents/clear`).pipe(
       tap(() => {
-        this.sources.set([]);
-        this.totalVectors.set(0);
+        this.currentSources.set([]);
+        this.vectorStats.set(0);
+        this.historyService.clearAllSessions();
       })
     );
   }

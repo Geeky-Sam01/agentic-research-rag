@@ -33,13 +33,13 @@
           </div>
 
           <!-- Uploaded document chips (only if any exist) -->
-          @if (docService.sources().length > 0) {
+          @if (docService.currentSources().length > 0) {
             <div class="w-full max-w-2xl flex flex-col items-start gap-2">
               <p class="text-[10px] text-text-muted uppercase tracking-[0.18em] font-bold opacity-40 select-none">
                 Uploaded Documents
               </p>
               <div class="flex flex-wrap gap-2">
-                @for (src of docService.sources(); track src) {
+                @for (src of docService.currentSources(); track src) {
                   <span class="doc-chip inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium bg-panel border border-border text-text-secondary">
                     <i class="pi pi-file-o text-[10px] text-accent"></i>
                     {{ src }}
@@ -72,5 +72,19 @@
 
     }
   </div>
+
+  <!-- 🍞 Global Toast -->
+  @if (docService.toastMessage()) {
+    <div class="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] animate-toast-in">
+      <div class="flex items-center gap-3 px-6 py-3 rounded-2xl bg-[#1A1A1A] border border-accent/30 shadow-2xl backdrop-blur-md">
+        <div class="w-8 h-8 flex items-center justify-center rounded-full bg-accent text-bg-main">
+          <i class="pi pi-bell text-xs"></i>
+        </div>
+        <p class="text-sm font-medium text-[#EAEAEA] tracking-tight">
+          {{ docService.toastMessage() }}
+        </p>
+      </div>
+    </div>
+  }
 
 </div>
