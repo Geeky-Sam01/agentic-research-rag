@@ -6,6 +6,7 @@ from langgraph.prebuilt import create_react_agent
 
 from app.core.config import settings
 from app.services.agent_tools import ALL_MF_TOOLS
+from app.services.prompts import MF_RESEARCH_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,7 @@ def create_research_agent(model_name: Optional[str] = None):
     )
 
     # Agent initialization
-    return create_react_agent(llm, ALL_MF_TOOLS)
+    return create_react_agent(llm, ALL_MF_TOOLS,prompt=MF_RESEARCH_SYSTEM_PROMPT)
 
 async def run_agent_query(user_input: str, chat_history: List[Any] = None) -> dict:
     """

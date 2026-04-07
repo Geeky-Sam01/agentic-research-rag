@@ -17,9 +17,9 @@
       </h1>
       <div class="text-[10px] text-text-muted mt-1.5 font-medium uppercase tracking-wider">
         @if (chatService.loading()) {
-          <span class="flex items-center gap-1.5">
-            <span class="w-1.5 h-1.5 rounded-full bg-[#171717] animate-pulse"></span>
-            Thinking…
+          <span class="flex items-center gap-1.5 min-w-0">
+            <span class="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span>
+            <span class="truncate">{{ chatService.status() || 'Thinking…' }}</span>
           </span>
         } @else {
           Model Selected

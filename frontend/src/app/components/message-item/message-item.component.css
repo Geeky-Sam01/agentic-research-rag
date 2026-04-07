@@ -28,3 +28,32 @@
 :host ::ng-deep .p-skeleton-animation-none::after {
   content: none !important;
 }
+
+/* 🧠 Research Steps Accordion */
+.thoughts-trigger {
+  width: fit-content;
+  cursor: pointer;
+  user-select: none;
+}
+
+.animate-slide-down {
+  animation: slideDown 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    max-height: 500px;
+  }
+}
+
+.status-row {
+  transition: all 0.2s ease;
+}

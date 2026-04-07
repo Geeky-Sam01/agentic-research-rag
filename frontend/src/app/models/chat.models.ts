@@ -7,6 +7,7 @@ export interface Message {
   timestamp: Date;
   isStreaming?: boolean;
   structuredPayload?: StructuredResponse | null;
+  statusHistory?: string[];
 }
 
 export interface Source {

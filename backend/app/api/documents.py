@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/documents", tags=["documents"])
 
 # ── Shared clients (initialised once at import time) ─────────────────────────
 _qdrant_client = get_client()
-# _embedder is now imported from embeddings service
+
  
 ensure_collection(_qdrant_client)
  
@@ -28,10 +28,10 @@ ensure_collection(_qdrant_client)
 @router.post("/upload", response_model=DocumentUploadResponse)
 async def upload_document(
     file:      UploadFile = File(...),
-    fund_name: str        = Form("Unknown Fund"),                          # "Parag Parikh Flexi Cap Fund"
-    doc_type:  str        = Form("other"),                  # "factsheet" | "annual_report" | "other"
-    period:    str        = Form("Unknown Period"),                          # "2025-01"  or  "2025"
-    overwrite: bool       = Form(False),                        # delete existing points first
+    fund_name: str        = Form("Unknown Fund"),                          
+    doc_type:  str        = Form("other"),                  
+    period:    str        = Form("Unknown Period"),                          
+    overwrite: bool       = Form(False),                        
 ) -> DocumentUploadResponse:
     """
     Upload and index a financial document (PDF or TXT) into Qdrant.
@@ -53,19 +53,19 @@ async def upload_document(
     file_path = Path(settings.UPLOAD_PATH) / file.filename
  
     try:
-        # ── 1. Save upload to disk ────────────────────────────────────────
+        
         content = await file.read()
         logger.debug(f"Saving {len(content)} bytes to {file_path}")
         with open(file_path, "wb") as f:
             f.write(content)  # type: ignore
         logger.info(f"Successfully saved {file.filename} to disk.")
  
-        # ── 2. Optionally clear previous version ──────────────────────────
+        
         if overwrite:
             logger.info(f"🗑️  Overwrite=True — deleting existing points for {file.filename}")
             delete_document(file.filename, _qdrant_client)
  
-        # ── 3. Run the full ingest pipeline ───────────────────────────────
+        
         #       extract → chunk → embed → upsert
         logger.info("🚀 Running ingest pipeline...")
         total_indexed, extracted_doc = ingest_file(
@@ -83,7 +83,7 @@ async def upload_document(
                 detail="No content could be extracted or indexed from the file.",
             )
 
-        # ── 4. Generate Smart Questions ───────────────────────────────────
+        
         from app.services.smart_questions import generate_smart_questions
         suggested_qs = generate_smart_questions(extracted_doc, fund_name)
 

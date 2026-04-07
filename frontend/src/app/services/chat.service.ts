@@ -45,14 +45,16 @@ export class ChatService {
       role: 'assistant',
       content: '',
       timestamp: new Date(),
-      isStreaming: true
+      isStreaming: true,
+      statusHistory: []
     };
     this.messages.update((msgs: Message[]) => [...msgs, assistantMsg]);
     this.loading.set(true);
 
-    // Initial status
-    this.status.set('Thinking...');
-    this.statusHistory.set(['Thinking...']);
+    const initialStatus = 'Thinking...';
+    this.status.set(initialStatus);
+    this.statusHistory.set([initialStatus]);
+    this.updateMessageStatus(assistantId, initialStatus);
 
     const url = `${this.BASE_URL}/api/chat/query-stream?query=${encodeURIComponent(query)}&model=${this.selectedModel()}`;
     this.eventSource = new EventSource(url);
@@ -66,6 +68,7 @@ export class ChatService {
           const statusMsg = this.getToolStatusMessage(data.tool, data.input);
           this.status.set(statusMsg);
           this.statusHistory.update(prev => [...prev, statusMsg]);
+          this.updateMessageStatus(assistantId, statusMsg);
           return;
         }
 
@@ -92,6 +95,7 @@ export class ChatService {
           const msg = `Retrieved ${data.sources.length} relevant sections`;
           this.status.set(msg);
           this.statusHistory.update((prev: string[]) => [...prev, msg]);
+          this.updateMessageStatus(assistantId, msg);
           return;
         }
 
@@ -104,9 +108,15 @@ export class ChatService {
 
         // Handle error
         if (data.error) {
+          let errorMsg = data.error;
+          // Exact request: Handle 429 - provider rate limits
+          if (typeof errorMsg === 'string' && errorMsg.includes('429')) {
+             errorMsg = 'Oops tokens exhausted';
+          }
+          
           this.messages.update((msgs: Message[]) => msgs.map((m: Message) =>
             m.id === assistantId
-              ? { ...m, content: m.content || `⚠️ ${data.error}` }
+              ? { ...m, content: m.content || `⚠️ ${errorMsg}` }
               : m
           ));
           this.finishStream(assistantId);
@@ -160,7 +170,8 @@ export class ChatService {
       role: 'assistant',
       content: '',
       timestamp: new Date(),
-      isStreaming: true
+      isStreaming: true,
+      statusHistory: []
     };
     this.messages.update((msgs: Message[]) => [...msgs, assistantMsg]);
     this.loading.set(true);
@@ -221,6 +232,12 @@ export class ChatService {
     this.historyService.updateCurrentSession(this.messages(), this.chunks());
   }
 
+  private updateMessageStatus(id: string, status: string) {
+    this.messages.update(msgs => msgs.map(m => 
+      m.id === id ? { ...m, statusHistory: [...(m.statusHistory || []), status] } : m
+    ));
+  }
+
   private closeStream(): void {
     if (this.eventSource) {
       this.eventSource.close();
@@ -229,22 +246,8 @@ export class ChatService {
   }
 
   private getToolStatusMessage(tool: string, input: any): string {
-    const query = input?.query || input?.scheme_code || input?.amc_name || '';
-    const suffix = query ? ` for "${query}"` : '...';
-
-    const toolMap: Record<string, string> = {
-      'read_factsheet': 'Reading fund documents',
-      'get_scheme_quote': 'Fetching latest NAV',
-      'search_schemes': 'Searching fund house portfolio',
-      'search_scheme_by_name': 'Searching for scheme by keyword',
-      'get_historical_nav': 'Retrieving historical performance',
-      'calculate_returns': 'Calculating investment returns',
-      'get_equity_performance': 'Analyzing equity market performance',
-      'get_debt_performance': 'Analyzing debt market performance',
-      'get_hybrid_performance': 'Analyzing hybrid market performance'
-    };
-
-    return (toolMap[tool] || `Executing ${tool}`) + suffix;
+    // Exact request: "using tool {tool}..."
+    return `using tool ${tool}...`;
   }
 
   setSelectedChunk(id: string | null): void {

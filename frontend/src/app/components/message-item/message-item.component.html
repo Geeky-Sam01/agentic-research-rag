@@ -18,26 +18,47 @@
       <span class="text-[11px] font-bold tracking-widest text-text-muted uppercase">Assistant</span>
     </div>
 
-    <!-- Processing Status Log (before answer starts) -->
-    @if (message.isStreaming && message.content.length === 0) {
-      <div class="flex flex-col gap-2.5 pl-10 pr-4 mt-1">
-        @for (status of chatService.statusHistory(); track $index) {
-          <div class="status-row flex items-center gap-2.5 text-[12.5px] font-medium text-text-secondary animate-fade-in">
-            <!-- Icon change based on status -->
-             @if ($index === chatService.statusHistory().length - 1 && chatService.loading()) {
-                <i class="pi pi-spin pi-spinner text-[11px] text-accent"></i>
-             } @else {
-                <i class="pi pi-check-circle text-[11px] text-green-500/80"></i>
-             }
-            <span [class.text-text-primary]=" $index === chatService.statusHistory().length - 1">{{ status }}</span>
+    <!-- Collapsible Research Steps -->
+    @if (message.role === 'assistant' && message.statusHistory && message.statusHistory.length > 0) {
+      <div class="flex flex-col pl-10 pr-4 mt-1 mb-4">
+        
+        <!-- Accordion Trigger -->
+        <button (click)="toggleThoughts()" 
+                class="thoughts-trigger flex items-center gap-2 px-2 py-1 rounded-md transition-all hover:bg-border-soft group/trigger">
+          <i class="pi pi-chevron-right text-[9px] transition-transform duration-200"
+             [class.rotate-90]="showThoughts()"></i>
+          <span class="text-[10px] font-bold uppercase tracking-widest text-text-muted group-hover/trigger:text-text-primary">
+            Research Steps
+            @if (!showThoughts()) {
+              <span class="lowercase font-medium ml-1 opacity-50">({{ message.statusHistory.length }} steps)</span>
+            }
+          </span>
+        </button>
+
+        <!-- Collapsible Content -->
+        @if (showThoughts()) {
+          <div class="flex flex-col gap-2 mt-2 ml-4 animate-slide-down">
+            @for (status of message.statusHistory; track $index) {
+              <div class="status-row flex items-center gap-2.5 text-[12px] font-medium text-text-secondary/70">
+                 @if ($index === message.statusHistory.length - 1 && message.isStreaming) {
+                    <i class="pi pi-spin pi-spinner text-[10px] text-accent"></i>
+                 } @else {
+                    <i class="pi pi-check text-[10px] text-accent/50"></i>
+                 }
+                <span [class.text-text-primary]=" $index === message.statusHistory.length - 1 && message.isStreaming"
+                      class="opacity-60">{{ status }}</span>
+              </div>
+            }
           </div>
         }
-        
-        <!-- Skeleton below status if still empty -->
-        <div class="mt-4 space-y-3 opacity-20">
-          <p-skeleton width="85%" height="12px" />
-          <p-skeleton width="60%" height="12px" />
-        </div>
+      </div>
+    }
+
+    <!-- Content block (Show skeleton if streaming and no content yet) -->
+    @if (message.isStreaming && message.content.length === 0) {
+      <div class="pl-10 pr-4 mt-2 space-y-3 opacity-20">
+        <p-skeleton width="85%" height="12px" />
+        <p-skeleton width="60%" height="12px" />
       </div>
     } @else {
       <!-- Content block -->
