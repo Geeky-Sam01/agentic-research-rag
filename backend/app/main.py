@@ -4,7 +4,7 @@ import logging
 from app.core.config import settings
 from app.api.documents import router as documents_router
 from app.api.chat import router as chat_router
-from app.services.document_processor import init_ocr
+from app.services.document_processor import init_ocr  # Verifies Tesseract OCR environment
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -23,7 +23,7 @@ app = FastAPI(
 async def startup_event():
     """Tasks to run on startup: pre-load models, connect DBs, etc."""
     logger.info("Starting up Agentic Research RAG API...")
-    # Pre-load EasyOCR weights so they're ready for image PDFs instantly
+    # Verify document processing is ready
     init_ocr()
 
 # Add CORS middleware

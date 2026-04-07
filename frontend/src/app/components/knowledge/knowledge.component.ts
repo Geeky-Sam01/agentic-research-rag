@@ -1,4 +1,4 @@
-import { Component, inject, computed } from '@angular/core';
+import { Component, inject, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DocumentService } from '../../services/document.service';
 import { TableModule } from 'primeng/table';
@@ -13,8 +13,13 @@ import { TooltipModule } from 'primeng/tooltip';
   templateUrl: './knowledge.component.html',
   styleUrl: './knowledge.component.css'
 })
-export class KnowledgeComponent {
+export class KnowledgeComponent implements OnInit {
   private documentService = inject(DocumentService);
+  
+  ngOnInit(): void {
+    // Restore state from backend on load/refresh
+    this.documentService.fetchStats();
+  }
   
   // Use DocumentService's signals
   public sources = this.documentService.currentSources;

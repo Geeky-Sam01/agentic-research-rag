@@ -15,5 +15,5 @@
 }
 
 :host ::ng-deep .p-skeleton::after {
-  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.04), transparent) !important;
+  background: linear-gradient(90deg, transparent, rgba(22, 163, 74, 0.05), transparent) !important;
 }

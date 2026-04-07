@@ -13,6 +13,11 @@
 - **Contextual Chunking:** Section headings are merged into chunk text (`heading\n\nbody`) to preserve metadata without complex retrieval patterns.
 - **Deduplicated Citations:** Backend filters prevent duplicate source tags for multiple chunks from the same file.
 
+### Structured Outputs & LangChain Architecture
+- **Native Schema Enforcement:** Strict Pydantic parsing (`FinSightResponse`) moved to `app.models.schemas` for centralized architectural consistency.
+- **Dual-Mode Pipelines:** Dedicated `/query-stream` (Markdown generation) and `/query-structured` (JSON block mapping) endpoints.
+- **Dynamic UI Mapping:** Angular dynamically interprets complex block architectures (`MetricBlock`, `TableBlock`, `SummaryBlock`) rendering nested HTML templates.
+
 ### Chat & Persistence
 - **Local History:** Full conversation persistence via `IndexedDB`. Messages and retrieved context remain available across refreshes.
 - **Session Management:** Dedicated sidebar for creating, switching, and deleting chat sessions. Titles are auto-generated from the first query.
@@ -20,7 +25,8 @@
 
 ### UI/UX (Premium Black + Orange)
 - **3-Pane Layout:** Sidebar (History/KB), Center (Chat), Right (Evidence/Citations).
-- **"Google Search" Bar:** Floating pill-shaped input with integrated model selection and action chips.
+- **Adaptive Search Bar:** Floating pill-shaped input that instantly transitions to a stacked textarea layout for large or multiline text.
+- **Instant State Switching:** No-animation transitions for UI layout changes to maintain a snappy, high-performance interface.
 - **Granular Feedback:** UI tracking for "Searching", "Retrieving", and "Synthesizing" stages.
 - **Shortcuts:** `Ctrl+B` (Toggle History/KB), `Ctrl+Alt+B` (Toggle Evidence).
 
@@ -31,6 +37,7 @@
 - `api/documents.py` -> Upload & index management.
 - `services/document_processor.py` -> PDF parsing, EasyOCR, and logical chunking.
 - `services/injest.py` -> Qdrant collection management and embedding loops.
+- `models/schemas.py` -> Centralized source of truth for Pydantic request/response models.
 
 ### Frontend (`/frontend/src/app`)
 - `services/chat.service.ts` -> Streaming & state bridge.
