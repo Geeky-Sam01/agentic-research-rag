@@ -61,20 +61,20 @@ graph LR
 ### 🖥️ 2-Pane Dashboard
 The intuitive 2-pane interface separates the primary research chat from the context-aware knowledge sidebar.
 <p align="center">
-  <img src="file:///C:/Users/admin/.gemini/antigravity/brain/a07aabc3-b091-4f05-8a7d-0fca57d3c716/media__1775597536086.png" width="90%" border="1" />
+  <img src="assets/Screenshot 2026-04-08 032453.png" width="90%" border="1" />
 </p>
 
 ### 🧠 Research Steps & 📊 Structured Analysis
 Inspect the agent's real-time thought process or switch to "Explainer Mode" for highly structured tabular summaries.
 <p align="center">
-  <img src="file:///C:/Users/admin/.gemini/antigravity/brain/a07aabc3-b091-4f05-8a7d-0fca57d3c716/media__1775601708848.png" width="48%" />
-  <img src="file:///C:/Users/admin/.gemini/antigravity/brain/a07aabc3-b091-4f05-8a7d-0fca57d3c716/media__1775601729606.png" width="48%" />
+  <img src="assets/Screenshot 2026-04-08 032558.png" width="48%" />
+  <img src="assets/Screenshot 2026-04-08 032910.png" width="48%" />
 </p>
 
 ### 📚 Knowledge Library
 Command center for document management, indexing status, and automated discovery.
 <p align="center">
-  <img src="file:///C:/Users/admin/.gemini/antigravity/brain/a07aabc3-b091-4f05-8a7d-0fca57d3c716/media__1775601741740.png" width="90%" />
+  <img src="assets/Screenshot 2026-04-08 032943.png" width="90%" />
 </p>
 
 ---
