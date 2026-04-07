@@ -11,6 +11,7 @@ export class DocumentService {
   public indexingState = signal<UploadStatus>('idle');
   public vectorStats = signal<number>(0);
   public toastMessage = signal<string | null>(null);
+  public suggestedQuestions = signal<string[]>([]);
 
   private http = inject(HttpClient);
   private historyService = inject(ChatHistoryService);
@@ -37,8 +38,9 @@ export class DocumentService {
     formData.append('file', file);
 
     return this.http.post<any>(`${this.BASE_URL}/api/documents/upload`, formData).pipe(
-      tap(() => {
+      tap((res) => {
         this.indexingState.set('done');
+        this.suggestedQuestions.set(res.suggested_questions || []);
         this.fetchStats();
         setTimeout(() => this.indexingState.set('idle'), 3000);
       }),
@@ -55,6 +57,7 @@ export class DocumentService {
       tap(() => {
         this.currentSources.set([]);
         this.vectorStats.set(0);
+        this.suggestedQuestions.set([]);
         this.historyService.clearAllSessions();
       })
     );

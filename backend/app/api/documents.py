@@ -65,10 +65,9 @@ async def upload_document(
             delete_document(file.filename, _qdrant_client)
  
         # ── 3. Run the full ingest pipeline ───────────────────────────────
-        #       extract → chunk (+metadata) → embed → upsert
+        #       extract → chunk → embed → upsert
         logger.info("🚀 Running ingest pipeline...")
- 
-        total_indexed = ingest_file(
+        total_indexed, extracted_doc = ingest_file(
             file_path = str(file_path),
             fund_name = fund_name,
             doc_type  = doc_type,
@@ -76,15 +75,19 @@ async def upload_document(
             client    = _qdrant_client,
             embedder  = _embedder,
         )
- 
+
         if total_indexed == 0:
             raise HTTPException(
                 status_code=400,
                 detail="No content could be extracted or indexed from the file.",
             )
- 
+
+        # ── 4. Generate Smart Questions ───────────────────────────────────
+        from app.services.smart_questions import generate_smart_questions
+        suggested_qs = generate_smart_questions(extracted_doc, fund_name)
+
         logger.info(f"✅ Indexed {total_indexed} chunks from {file.filename}")
- 
+
         return DocumentUploadResponse(
             success            = True,
             message            = f"Indexed {total_indexed} chunks from {file.filename}",
@@ -92,6 +95,7 @@ async def upload_document(
             chunksCreated      = total_indexed,
             embeddingModel     = settings.EMBEDDING_MODEL,
             embeddingDimension = settings.EMBEDDING_DIM,
+            suggested_questions = suggested_qs
         )
  
     except HTTPException:
@@ -106,6 +110,7 @@ async def upload_document(
         if file_path.exists():
             logger.debug(f"Cleaning up temporary file: {file_path}")
             file_path.unlink()
+
 @router.get("/stats")
 async def get_stats():
     """Get knowledge base statistics from Qdrant."""
@@ -121,7 +126,6 @@ async def get_stats():
     except Exception as e:
         logger.error(f"Stats error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.delete("/clear")
 async def clear_index():

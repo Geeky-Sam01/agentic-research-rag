@@ -76,10 +76,10 @@ def ingest_file(
     period:     str,   # "2025-01" for Jan 2025 factsheet, "2025" for annual report
     client:     QdrantClient,
     embedder:   Any,
-) -> int:
+) -> tuple[int, List[Dict[str, Any]]]:
     """
     Full pipeline:  file → extract → chunk → embed → upsert.
-    Returns number of points upserted.
+    Returns (number of points upserted, extracted document).
     """
     path = Path(file_path)
 
@@ -87,10 +87,9 @@ def ingest_file(
     document = extract_text_from_file(file_path)
     if not document:
         print(f"⚠️  No content extracted from {path.name}")
-        return 0
+        return 0, []
 
     # ── 2. Build doc-level metadata (passed in from caller) ───────────
-    # These are the fields you KNOW at ingest time that the parser can't infer.
     doc_metadata: Dict[str, Any] = {
         "source_file": path.name,
         "file_type":   path.suffix.lstrip(".").lower(),  # "pdf" | "txt"
@@ -103,19 +102,15 @@ def ingest_file(
     chunks = chunk_structured_document(document, doc_metadata=doc_metadata)
     if not chunks:
         print(f"⚠️  No chunks produced from {path.name}")
-        return 0
+        return 0, document
 
     print(f"📄 {path.name}  →  {len(chunks)} chunks")
 
     # ── 4. Embed ──────────────────────────────────────────────────────
-    # We embed `text` which already contains  "heading\n\nbody"
-    # BGE models benefit from a query prefix — for docs use no prefix.
     texts  = [c["text"] for c in chunks]
     vectors = embedder.encode(texts, batch_size=32, show_progress_bar=True).tolist()
 
     # ── 5. Build Qdrant points ────────────────────────────────────────
-    # The payload IS the chunk dict (minus the text used for embedding).
-    # Qdrant stores payload as-is; you can filter on any field.
     points: List[PointStruct] = []
     for chunk, vector in zip(chunks, vectors):
         payload = {k: v for k, v in chunk.items()}  # full chunk as payload
@@ -136,7 +131,7 @@ def ingest_file(
         )
 
     print(f"✅ Upserted {len(points)} points for {path.name}")
-    return len(points)
+    return len(points), document
 
 
 # ------------------------------------------------------------------ #

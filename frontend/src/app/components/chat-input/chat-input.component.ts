@@ -5,13 +5,16 @@ import { Textarea } from 'primeng/textarea';
 import { TextareaModule } from 'primeng/textarea';
 import { ButtonModule } from 'primeng/button';
 import { ChatService } from '../../services/chat.service';
+import { DocumentService } from '../../services/document.service';
 
 import { CommonModule } from '@angular/common';
+
+import { ToggleButtonModule } from 'primeng/togglebutton';
 
 @Component({
   selector: 'app-chat-input',
   standalone: true,
-  imports: [CommonModule, FormsModule, ButtonModule, Select, TextareaModule],
+  imports: [CommonModule, FormsModule, ButtonModule, Select, TextareaModule, ToggleButtonModule],
   templateUrl: './chat-input.component.html',
   styleUrl: './chat-input.component.css'
 })
@@ -20,6 +23,7 @@ export class ChatInputComponent {
   @Output() send = new EventEmitter<{query: string, isStructured: boolean}>();
 
   chatService = inject(ChatService);
+  docService = inject(DocumentService);
   inputValue = '';
   focused = signal(false);
   isStructuredMode = false;
@@ -58,6 +62,11 @@ export class ChatInputComponent {
 
   isLarge(): boolean {
     return this.inputValue.length > 60 || this.inputValue.includes('\n');
+  }
+
+  useSuggestedQuestion(q: string): void {
+    this.inputValue = q;
+    this.sendMessage();
   }
 
   sendMessage(): void {

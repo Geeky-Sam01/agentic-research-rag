@@ -30,21 +30,29 @@
     </div>
   </div>
 
-  <!-- 2. Chat / Agent Selector Box -->
+  <!-- 2. Chat / Knowledge Selector Box -->
   <div class="px-3.5 mb-6">
     <div class="selector-box p-1 rounded-2xl bg-panel border border-border flex flex-col gap-1 shadow-sm"
       [class.items-center]="!uiState.showHistory()">
-      <div class="selector-item active-selector" [class.justify-center]="!uiState.showHistory()"
-        [class.w-8]="!uiState.showHistory()" [class.h-8
-        ]="!uiState.showHistory()">
+      
+      <!-- Chat Mode -->
+      <div (click)="uiState.setWorkspace('chat')" 
+        class="selector-item" 
+        [class.active-selector]="uiState.activeWorkspace() === 'chat'"
+        [class.justify-center]="!uiState.showHistory()"
+        [class.w-8]="!uiState.showHistory()" [class.h-8]="!uiState.showHistory()">
         <i class="pi pi-file-edit text-sm" [class.text-lg]="!uiState.showHistory()"></i>
         <span *ngIf="uiState.showHistory()">Chat</span>
       </div>
-      <div class="selector-item group" [class.justify-center]="!uiState.showHistory()"
-        [class.w-8]="!uiState.showHistory()" [class.h-8
-        ]="!uiState.showHistory()">
-        <i class="pi pi-user text-sm group-hover:text-text-primary" [class.text-lg]="!uiState.showHistory()"></i>
-        <span *ngIf="uiState.showHistory()" class="group-hover:text-text-primary">Agent</span>
+
+      <!-- Knowledge Mode -->
+      <div (click)="uiState.setWorkspace('knowledge')"
+        class="selector-item group" 
+        [class.active-selector]="uiState.activeWorkspace() === 'knowledge'"
+        [class.justify-center]="!uiState.showHistory()"
+        [class.w-8]="!uiState.showHistory()" [class.h-8]="!uiState.showHistory()">
+        <i class="pi pi-file text-sm group-hover:text-text-primary" [class.text-lg]="!uiState.showHistory()"></i>
+        <span *ngIf="uiState.showHistory()" class="group-hover:text-text-primary">Knowledge</span>
       </div>
     </div>
   </div>

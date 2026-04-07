@@ -1,0 +1,78 @@
+.knowledge-container {
+  background: #fafafa;
+}
+
+/* — Action Buttons — */
+:host ::ng-deep .knowledge-btn {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+:host ::ng-deep .knowledge-btn .p-button {
+  background: #171717 !important;
+  border: 1px solid #171717 !important;
+  border-radius: 8px !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  padding: 8px 16px !important;
+  color: white !important;
+}
+
+:host ::ng-deep .clear-btn {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+:host ::ng-deep .clear-btn .p-button {
+  background: transparent !important;
+  border: 1px solid #e7e5e4 !important;
+  border-radius: 8px !important;
+  font-weight: 700 !important;
+  font-size: 13px !important;
+  padding: 8px 16px !important;
+  color: #a8a29e !important;
+}
+
+:host ::ng-deep .clear-btn .p-button:hover {
+  background: #fafafa !important;
+  color: #171717 !important;
+  border-color: #171717 !important;
+}
+
+/* — p-table Overrides — */
+:host ::ng-deep .monochromatic-table .p-datatable-thead > tr > th {
+  background: #fafafa !important;
+  color: #a8a29e !important;
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.1em !important;
+  border-bottom: 1px solid #e7e5e4 !important;
+  padding: 1rem 1.5rem !important;
+}
+
+:host ::ng-deep .monochromatic-table .p-datatable-tbody > tr > td {
+  border-bottom: 1px solid #f5f5f4 !important;
+  padding: 1rem 1.5rem !important;
+  color: #44403c !important;
+}
+
+:host ::ng-deep .monochromatic-table .p-datatable-tbody > tr:hover {
+  background: #fdfdfd !important;
+}
+
+/* — Keyframes for Micro-Loader — */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.micro-loader {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid #d6d3d1;
+  border-top-color: #171717;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}

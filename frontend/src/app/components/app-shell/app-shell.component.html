@@ -37,7 +37,11 @@
       </div>
     }
 
-    <app-chat-panel class="flex-1 flex flex-col h-full" />
+    @if (uiState.activeWorkspace() === 'chat') {
+      <app-chat-panel class="flex-1 flex flex-col h-full" />
+    } @else {
+      <app-knowledge class="flex-1 flex flex-col h-full" />
+    }
   </main>
 
   <!-- 🔍 Collapsible Right Sidebar: Evidence -->

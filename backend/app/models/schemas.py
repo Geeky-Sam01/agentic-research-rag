@@ -9,6 +9,7 @@ class DocumentUploadResponse(BaseModel):
     chunksCreated: int
     embeddingModel: str
     embeddingDimension: int
+    suggested_questions: Optional[List[str]] = None
 
 class QueryRequest(BaseModel):
     query: str

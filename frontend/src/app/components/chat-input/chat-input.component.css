@@ -12,9 +12,12 @@
   background: var(--color-panel);
   border: 1px solid var(--color-border);
   border-radius: 12px;
-  padding: 14px 16px 10px 16px;
+  padding: 24px 20px 16px 20px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.03);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Focus state â€” clean border, no glow */
@@ -36,11 +39,11 @@
   box-shadow: none !important;
   resize: none !important;
   color: var(--color-text-primary) !important;
-  font-size: 15px !important;
+  font-size: 16px !important;
   font-weight: 400;
-  line-height: 1.5;
-  min-height: 24px;
-  max-height: 200px;
+  line-height: 1.6;
+  min-height: 48px;
+  max-height: 240px;
   padding: 0 !important;
 }
 
@@ -188,7 +191,7 @@
   padding: 8px 12px 8px 16px;
   background: var(--color-panel);
   border: 1px solid var(--color-border);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -402,5 +405,66 @@
   width: 1px;
   height: 18px;
   background: var(--color-border);
-  margin: 0 2px;
+  margin: 0 4px;
+}
+
+/* â€” p-togglebutton Overrides â€” */
+:host ::ng-deep .p-togglebutton {
+  background: transparent !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 8px !important;
+  color: var(--color-text-muted) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+  padding: 4px 12px !important;
+  transition: all 0.15s ease !important;
+  height: 32px !important;
+  min-width: 154px !important;
+}
+
+:host ::ng-deep .p-togglebutton:hover {
+  background: var(--color-bg-soft) !important;
+  border-color: var(--color-border-soft) !important;
+  color: var(--color-text-primary) !important;
+}
+
+:host ::ng-deep .p-togglebutton.p-togglebutton-checked {
+  background: #171717 !important;
+  border-color: #171717 !important;
+  color: #FFFFFF !important;
+}
+
+:host ::ng-deep .gsb-explainer-toggle .p-togglebutton {
+  font-size: 10px !important;
+  padding: 2px 8px !important;
+  height: 28px !important;
+  min-width: 130px !important;
+}
+/* — Suggested Chips Styling — */
+.suggested-chips-container {
+  animation: fadeInChips 0.4s ease-out;
+}
+
+.suggested-chip {
+  background: var(--color-panel) !important;
+  border: 1px solid var(--color-border) !important;
+  color: var(--color-text-secondary) !important;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  white-space: nowrap;
+}
+
+.suggested-chip:hover {
+  background: var(--color-bg-soft) !important;
+  border-color: var(--color-border-soft) !important;
+  color: var(--color-text-primary) !important;
+  transform: translateY(-1px);
+}
+
+@keyframes fadeInChips {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
 }

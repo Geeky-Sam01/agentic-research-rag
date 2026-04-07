@@ -2,6 +2,7 @@ import { Component, inject, HostListener } from '@angular/core';
 import { LeftPanelComponent } from '../left-panel/left-panel.component';
 import { ChatPanelComponent } from '../chat-panel/chat-panel.component';
 import { RightPanelComponent } from '../right-panel/right-panel.component';
+import { KnowledgeComponent } from '../knowledge/knowledge.component';
 import { UiStateService } from '../../services/ui-state.service';
 import { ChatService } from '../../services/chat.service';
 import { ChatHistoryService } from '../../services/chat-history.service';
@@ -14,6 +15,7 @@ import { Toast } from 'primeng/toast';
     LeftPanelComponent,
     ChatPanelComponent,
     RightPanelComponent,
+    KnowledgeComponent,
     Toast
   ],
   templateUrl: './app-shell.component.html',
