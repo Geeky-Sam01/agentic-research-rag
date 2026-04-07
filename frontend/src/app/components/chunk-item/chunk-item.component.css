@@ -7,15 +7,15 @@
 }
 
 .chunk-card:hover {
-  border-color: var(--color-accent) !important;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  border-color: var(--color-text-muted) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
   transform: translateY(-1px);
 }
 
 .selected-chunk {
-  background-color: var(--color-accent-soft) !important;
-  border-color: var(--color-accent) !important;
-  box-shadow: 0 0 15px rgba(22, 163, 74, 0.08) !important;
+  background-color: var(--color-bg-soft) !important;
+  border-color: var(--color-text-muted) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
 }
 
 .source-tag-box {
@@ -24,8 +24,8 @@
 }
 
 .selected-indicator i {
-  color: var(--color-accent) !important;
-  text-shadow: 0 0 12px rgba(22, 163, 74, 0.15) !important;
+  color: #171717 !important;
+  text-shadow: none !important;
 }
 
 .chunk-text {

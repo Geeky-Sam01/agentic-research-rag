@@ -3,7 +3,7 @@
      ═══════════════════════════════════════════════════ -->
 @if (isCentered) {
   <div class="centered-wrapper">
-    <div class="centered-box centered-glow-always" [class.is-large]="isLarge()">
+    <div class="centered-box" [class.is-large]="isLarge()">
 
       <!-- Textarea row -->
       <div class="centered-textarea-row">
@@ -66,8 +66,7 @@
       </div>
     </div>
 
-    <!-- Bottom glow line -->
-    <div class="centered-glow-line"></div>
+    <!-- Glow line removed -->
   </div>
 }
 
@@ -79,7 +78,6 @@
     <div class="bottom-inner">
       <div class="google-search-bar"
            [class.active-focus]="focused()"
-           [class.border-accent]="focused()"
            [class.is-large]="isLarge()">
         
         @if (!isLarge()) {

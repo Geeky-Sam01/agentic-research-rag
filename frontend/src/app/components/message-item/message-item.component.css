@@ -1,7 +1,7 @@
 .avatar-assistant {
-  background-color: var(--color-accent) !important;
+  background-color: #171717 !important;
   color: #FFFFFF !important;
-  box-shadow: 0 0 10px var(--color-accent-glow);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
 }
 
 .action-btn {
@@ -21,7 +21,7 @@
 }
 
 :host ::ng-deep .p-skeleton {
-  background-color: var(--color-bg-soft) !important;
+  background-color: #F5F5F5 !important;
   border-radius: 4px !important;
 }
 

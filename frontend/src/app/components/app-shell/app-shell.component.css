@@ -3,7 +3,7 @@
 }
 
 .nav-rail:hover {
-  background: rgba(22, 163, 74, 0.04) !important;
+  background: rgba(0, 0, 0, 0.01) !important;
 }
 
 .nav-item {
@@ -24,11 +24,11 @@
 }
 
 .active-nav {
-  background: var(--color-accent-soft) !important;
+  background: var(--color-bg-soft) !important;
 }
 
 .active-nav i {
-  color: var(--color-accent) !important;
+  color: #171717 !important;
 }
 
 .nav-tooltip {

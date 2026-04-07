@@ -11,22 +11,13 @@
 .centered-box {
   background: var(--color-panel);
   border: 1px solid var(--color-border);
-  border-radius: 24px;
+  border-radius: 16px;
   padding: 16px 20px 12px 20px;
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.04),
-    0 8px 24px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 /* Always-on glow (like reference image) */
-.centered-glow-always {
-  border-color: var(--color-accent) !important;
-  box-shadow:
-    0 0 0 1px var(--color-accent),
-    0 0 20px rgba(22, 163, 74, 0.08),
-    0 0 60px rgba(22, 163, 74, 0.05),
-    0 4px 16px rgba(0, 0, 0, 0.06) !important;
-}
+/* Removed centered-glow-always */
 
 .centered-textarea-row {
   width: 100%;
@@ -138,11 +129,11 @@
 }
 
 .centered-send.can-send {
-  background: var(--color-accent) !important;
-  border-color: var(--color-accent) !important;
-  color: black !important;
+  background: #171717 !important;
+  border-color: #171717 !important;
+  color: #FFFFFF !important;
   cursor: pointer !important;
-  box-shadow: 0 0 14px var(--color-accent-glow);
+  box-shadow: none !important;
 }
 
 .centered-send.can-send:hover {
@@ -151,34 +142,7 @@
   transform: scale(1.06);
 }
 
-/* — Glow line under centered input — */
-.centered-glow-line {
-  width: 100%;
-  height: 1px;
-  margin-top: 16px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(22, 163, 74, 0.1) 20%,
-    var(--color-accent) 50%,
-    rgba(22, 163, 74, 0.1) 80%,
-    transparent 100%
-  );
-  position: relative;
-}
-
-.centered-glow-line::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  top: -2px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color-accent);
-  box-shadow: 0 0 8px var(--color-accent);
-}
+/* Removed centered-glow-line and dot */
 
 
 /* ══════════════════════════════════════════════
@@ -210,9 +174,7 @@
   padding: 8px 12px 8px 16px;
   background: var(--color-panel);
   border: 1px solid var(--color-border);
-  box-shadow: 
-    0 10px 30px -10px rgba(0,0,0,0.1),
-    0 0 20px rgba(22, 163, 74, 0.03);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .google-search-bar.is-large {
@@ -223,9 +185,8 @@
 }
 
 .google-search-bar.active-focus {
-  background: var(--color-bg-soft);
-  border-color: var(--color-accent) !important;
-  box-shadow: 0 0 0 1px var(--color-accent), 0 0 20px var(--color-accent-glow) !important;
+  border-color: var(--color-border-soft) !important;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08) !important;
 }
 
 .gsb-plus {

@@ -4,7 +4,7 @@
 }
 
 .pro-button {
-  box-shadow: 0 4px 15px rgba(22, 163, 74, 0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   letter-spacing: 0.1em;
 }
 
@@ -17,8 +17,8 @@
 }
 
 .doc-chip:hover {
-  background: var(--color-accent-soft);
-  border-color: var(--color-accent);
+  background: var(--color-bg-soft);
+  border-color: var(--color-border-soft);
   color: var(--color-text-primary);
 }
 

@@ -2,25 +2,25 @@
 @import "primeicons/primeicons.css";
 
 @theme {
-  /* 🎨 Primary Palette — Light Mode (Black/White/Green) */
-  --color-bg-main: #F7FAF8;
-  --color-bg-soft: #EEF2F0;
+  /* 🎨 Primary Palette — Minimalist Neutral (z.ai Style) */
+  --color-bg-main: #FAFAFA;
+  --color-bg-soft: #F5F5F5;
   --color-panel: #FFFFFF;
 
-  /* 🟢 Accent (Green) */
-  --color-accent: #16A34A;
-  --color-accent-strong: #15803D;
-  --color-accent-glow: rgba(22, 163, 74, 0.3);
-  --color-accent-soft: rgba(22, 163, 74, 0.06);
+  /* ⚫ Minimal Accent (Near-Black) */
+  --color-accent: #171717;
+  --color-accent-strong: #000000;
+  --color-accent-glow: rgba(0, 0, 0, 0.08);
+  --color-accent-soft: rgba(0, 0, 0, 0.03);
 
-  /* ⚫ Text */
-  --color-text-primary: #1B2A1F;
-  --color-text-secondary: #4A5E50;
-  --color-text-muted: #8A9B8E;
+  /* ⚪ Pure Grayscale Text */
+  --color-text-primary: #171717;
+  --color-text-secondary: #737373;
+  --color-text-muted: #A3A3A3;
 
-  /* 🧱 Borders / Lines */
-  --color-border: #E2E8E4;
-  --color-border-soft: #D1D9D4;
+  /* 🧱 Pure Gray Borders / Lines */
+  --color-border: #E5E5E5;
+  --color-border-soft: #D4D4D4;
 }
 
 /* ── CSS Reset ─────────────────────────────── */
@@ -117,7 +117,7 @@ app-root {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border-soft);
+  background: #D4D4D4;
   border-radius: 4px;
 }
 
@@ -229,13 +229,13 @@ textarea.p-textarea:focus,
 
 /* ── Chat Specific Globals ──────────────────── */
 .msg-user {
-  background: #F0FDF4; /* green-50 */
-  border: 1px solid rgba(22, 163, 74, 0.15);
+  background: #F5F5F5;
+  border: 1px solid #E5E5E5;
   border-radius: 18px 18px 4px 18px;
   padding: 10px 16px;
   max-width: 80%;
   color: var(--color-text-primary);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  box-shadow: none;
 }
 
 .msg-assistant {
@@ -371,13 +371,13 @@ app-message-item .msg-assistant markdown p {
 }
 
 .prose-assistant markdown code {
-  background: rgba(22, 163, 74, 0.05);
-  border: 1px solid rgba(22, 163, 74, 0.1);
+  background: #F5F5F5;
+  border: 1px solid #E5E5E5;
   border-radius: 4px;
   padding: 2px 6px;
   font-size: 13px;
   font-family: 'Fira Code', 'Courier New', monospace;
-  color: var(--color-accent);
+  color: var(--color-text-primary);
 }
 
 .prose-assistant markdown pre {
@@ -474,7 +474,7 @@ app-message-item .msg-assistant markdown p {
 .p-select-panel {
   background: var(--color-panel) !important;
   border: 1px solid var(--color-border) !important;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08) !important;
   border-radius: 12px !important;
   padding: 4px !important;
   margin-top: 4px !important;
