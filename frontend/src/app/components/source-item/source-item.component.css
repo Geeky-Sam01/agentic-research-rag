@@ -8,7 +8,7 @@
 
 .source-item:hover {
   border-color: var(--color-accent) !important;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
 }
 
 .file-icon-box {

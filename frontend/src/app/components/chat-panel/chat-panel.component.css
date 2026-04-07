@@ -1,10 +1,10 @@
 /* 🧩 Component Specific Styles for ChatPanel */
 .hero-title {
-  text-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  text-shadow: 0 1px 4px rgba(0,0,0,0.05);
 }
 
 .pro-button {
-  box-shadow: 0 4px 15px rgba(255, 122, 26, 0.1);
+  box-shadow: 0 4px 15px rgba(22, 163, 74, 0.05);
   letter-spacing: 0.1em;
 }
 
@@ -17,8 +17,8 @@
 }
 
 .doc-chip:hover {
-  background: rgba(255, 122, 26, 0.08);
-  border-color: rgba(255, 122, 26, 0.4);
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
   color: var(--color-text-primary);
 }
 

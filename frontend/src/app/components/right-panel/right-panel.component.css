@@ -11,9 +11,9 @@
 }
 
 :host ::ng-deep .p-skeleton {
-  background-color: var(--color-border) !important;
+  background-color: var(--color-bg-soft) !important;
 }
 
 :host ::ng-deep .p-skeleton::after {
-  background: linear-gradient(90deg, transparent, rgba(255, 122, 26, 0.05), transparent) !important;
+  background: linear-gradient(90deg, transparent, rgba(22, 163, 74, 0.05), transparent) !important;
 }

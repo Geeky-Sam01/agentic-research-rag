@@ -8,14 +8,14 @@
 
 .chunk-card:hover {
   border-color: var(--color-accent) !important;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
   transform: translateY(-1px);
 }
 
 .selected-chunk {
-  background-color: var(--color-bg-soft) !important;
+  background-color: var(--color-accent-soft) !important;
   border-color: var(--color-accent) !important;
-  box-shadow: 0 0 15px var(--color-accent-glow) !important;
+  box-shadow: 0 0 15px rgba(22, 163, 74, 0.08) !important;
 }
 
 .source-tag-box {
@@ -25,7 +25,7 @@
 
 .selected-indicator i {
   color: var(--color-accent) !important;
-  text-shadow: 0 0 12px var(--color-accent) !important;
+  text-shadow: 0 0 12px rgba(22, 163, 74, 0.15) !important;
 }
 
 .chunk-text {

@@ -60,8 +60,14 @@ async def generate_answer_structured(
         
     except Exception as e:
         logger.error(f"LLM Structured Output error: {str(e)}")
-        return SummaryCard(
-            headline="Error rendering response", 
-            key_points=[f"We encountered an error with structured outputs: {str(e)}"], 
-            conclusion="Please try again or use standard stream mode."
-        ).model_dump()
+        return {
+        "type": "finsight",
+        "query": query,
+        "intent": "error",
+        "confidence": 0.0,
+        "blocks": [{
+            "type": "summary",
+            "title": "Error",
+            "text": f"Could not generate structured response: {str(e)}. Please try again or switch to Explainer Mode."
+        }]
+    }

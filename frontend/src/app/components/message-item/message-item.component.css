@@ -1,6 +1,6 @@
 .avatar-assistant {
   background-color: var(--color-accent) !important;
-  color: black !important;
+  color: #FFFFFF !important;
   box-shadow: 0 0 10px var(--color-accent-glow);
 }
 
@@ -21,7 +21,7 @@
 }
 
 :host ::ng-deep .p-skeleton {
-  background-color: var(--color-border) !important;
+  background-color: var(--color-bg-soft) !important;
   border-radius: 4px !important;
 }
 

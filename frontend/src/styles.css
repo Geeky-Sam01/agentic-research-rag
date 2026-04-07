@@ -2,28 +2,25 @@
 @import "primeicons/primeicons.css";
 
 @theme {
-  /* 🎨 Primary Palette */
-  --color-bg-main: #000000;
-  --color-bg-soft: #050505;
-  --color-panel: #0A0A0A;
+  /* 🎨 Primary Palette — Light Mode (Black/White/Green) */
+  --color-bg-main: #F7FAF8;
+  --color-bg-soft: #EEF2F0;
+  --color-panel: #FFFFFF;
 
-  /* 🟠 Accent (Orange) */
-  --color-accent: #FF7A1A;
-  --color-accent-strong: #FF8C2A;
-  --color-accent-glow: rgba(255, 122, 26, 0.4);
-  --color-accent-soft: rgba(255, 122, 26, 0.08);
+  /* 🟢 Accent (Green) */
+  --color-accent: #16A34A;
+  --color-accent-strong: #15803D;
+  --color-accent-glow: rgba(22, 163, 74, 0.3);
+  --color-accent-soft: rgba(22, 163, 74, 0.06);
 
-  /* ⚪ Text */
-  --color-text-primary: #EAEAEA;
-  --color-text-secondary: #A3A3A3;
-  --color-text-muted: #6B6B6B;
+  /* ⚫ Text */
+  --color-text-primary: #1B2A1F;
+  --color-text-secondary: #4A5E50;
+  --color-text-muted: #8A9B8E;
 
   /* 🧱 Borders / Lines */
-  --color-border: #1A1A1A;
-  --color-border-soft: #262626;
-
-  /* Spacing Scale (Tailwind 4 default is fine, usually 4px scale) */
-  /* If needed, explicit overrides here */
+  --color-border: #E2E8E4;
+  --color-border-soft: #D1D9D4;
 }
 
 /* ── CSS Reset ─────────────────────────────── */
@@ -232,13 +229,13 @@ textarea.p-textarea:focus,
 
 /* ── Chat Specific Globals ──────────────────── */
 .msg-user {
-  background: var(--color-accent-soft);
-  border: 1px solid rgba(255, 122, 26, 0.2);
+  background: #F0FDF4; /* green-50 */
+  border: 1px solid rgba(22, 163, 74, 0.15);
   border-radius: 18px 18px 4px 18px;
   padding: 10px 16px;
   max-width: 80%;
   color: var(--color-text-primary);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 .msg-assistant {
@@ -374,8 +371,8 @@ app-message-item .msg-assistant markdown p {
 }
 
 .prose-assistant markdown code {
-  background: rgba(255, 122, 26, 0.08);
-  border: 1px solid rgba(255, 122, 26, 0.2);
+  background: rgba(22, 163, 74, 0.05);
+  border: 1px solid rgba(22, 163, 74, 0.1);
   border-radius: 4px;
   padding: 2px 6px;
   font-size: 13px;
@@ -477,7 +474,7 @@ app-message-item .msg-assistant markdown p {
 .p-select-panel {
   background: var(--color-panel) !important;
   border: 1px solid var(--color-border) !important;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6) !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1) !important;
   border-radius: 12px !important;
   padding: 4px !important;
   margin-top: 4px !important;

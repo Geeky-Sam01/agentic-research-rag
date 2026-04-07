@@ -10,14 +10,12 @@
 
 .centered-box {
   background: var(--color-panel);
-  border: 2px solid rgba(255, 122, 26, 0.5);
-  border-radius: 24px;
-  padding: 16px 20px 12px 20px;
+  border: 1px solid var(--color-border);
   border-radius: 24px;
   padding: 16px 20px 12px 20px;
   box-shadow:
-    0 4px 30px rgba(0, 0, 0, 0.5),
-    0 0 0 0 transparent;
+    0 2px 8px rgba(0, 0, 0, 0.04),
+    0 8px 24px rgba(0, 0, 0, 0.03);
 }
 
 /* Always-on glow (like reference image) */
@@ -25,9 +23,9 @@
   border-color: var(--color-accent) !important;
   box-shadow:
     0 0 0 1px var(--color-accent),
-    0 0 30px rgba(255, 122, 26, 0.15),
-    0 0 80px rgba(255, 122, 26, 0.08),
-    0 8px 40px rgba(0, 0, 0, 0.5) !important;
+    0 0 20px rgba(22, 163, 74, 0.08),
+    0 0 60px rgba(22, 163, 74, 0.05),
+    0 4px 16px rgba(0, 0, 0, 0.06) !important;
 }
 
 .centered-textarea-row {
@@ -161,9 +159,9 @@
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(255, 122, 26, 0.15) 20%,
+    rgba(22, 163, 74, 0.1) 20%,
     var(--color-accent) 50%,
-    rgba(255, 122, 26, 0.15) 80%,
+    rgba(22, 163, 74, 0.1) 80%,
     transparent 100%
   );
   position: relative;
@@ -211,13 +209,10 @@
   border-radius: 999px; /* Pill shape */
   padding: 8px 12px 8px 16px;
   background: var(--color-panel);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  padding: 8px 12px 8px 16px;
-  background: var(--color-panel);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--color-border);
   box-shadow: 
-    0 10px 40px -10px rgba(0,0,0,0.8),
-    0 0 20px rgba(255, 122, 26, 0.05);
+    0 10px 30px -10px rgba(0,0,0,0.1),
+    0 0 20px rgba(22, 163, 74, 0.03);
 }
 
 .google-search-bar.is-large {
@@ -249,7 +244,7 @@
 }
 
 .gsb-plus:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.05);
   color: var(--color-text-primary);
 }
 
@@ -288,7 +283,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
   margin-top: 10px;
   padding-top: 10px;
   width: 100%;
@@ -322,7 +317,7 @@
 }
 
 .gsb-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.05);
   color: var(--color-accent);
 }
 
