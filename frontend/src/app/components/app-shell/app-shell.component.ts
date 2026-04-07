@@ -39,18 +39,4 @@ export class AppShellComponent {
       this.uiState.toggleHistory();
     }
   }
-
-  newChat(): void {
-    this.chatService.clearMessages();
-    this.historyService.createNewChat();
-  }
-
-  loadChat(id: string): void {
-    this.chatService.loadSession(id);
-  }
-
-  deleteChat(event: Event, id: string): void {
-    event.stopPropagation();
-    this.historyService.deleteSession(id);
-  }
 }

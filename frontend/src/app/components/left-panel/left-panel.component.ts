@@ -1,73 +1,36 @@
-import { Component, inject, OnInit } from '@angular/core';
-import { CommonModule, DecimalPipe } from '@angular/common';
-import { DocumentService } from '../../services/document.service';
-import { SourceItemComponent } from '../source-item/source-item.component';
+import { Component, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ChatHistoryService } from '../../services/chat-history.service';
+import { UiStateService } from '../../services/ui-state.service';
+import { ChatService } from '../../services/chat.service';
 import { ButtonModule } from 'primeng/button';
-import { ProgressSpinner } from 'primeng/progressspinner';
-import { MessageService } from 'primeng/api';
+import { TooltipModule } from 'primeng/tooltip';
 
 @Component({
   selector: 'app-left-panel',
   standalone: true,
-  imports: [CommonModule, SourceItemComponent, ButtonModule, ProgressSpinner, DecimalPipe],
+  imports: [CommonModule, ButtonModule, TooltipModule],
   templateUrl: './left-panel.component.html',
   styleUrl: './left-panel.component.css'
 })
-export class LeftPanelComponent implements OnInit {
-  public docService: DocumentService = inject(DocumentService);
-  private messageService = inject(MessageService);
+export class LeftPanelComponent {
+  public historyService = inject(ChatHistoryService);
+  public uiState = inject(UiStateService);
+  private chatService = inject(ChatService);
 
-  ngOnInit(): void {
-    this.docService.fetchStats();
+  newChat() {
+    this.chatService.clearMessages();
+    this.historyService.createNewChat();
   }
 
-  onFileChange(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-
-    this.docService.uploadDocument(file).subscribe({
-      next: (res) => {
-        this.messageService.add({
-          severity: 'success',
-          summary: 'Uploaded',
-          detail: res.message || 'Document indexed successfully',
-          life: 4000
-        });
-      },
-      error: (err) => {
-        this.messageService.add({
-          severity: 'error',
-          summary: 'Upload Failed',
-          detail: err?.error?.detail || 'Could not upload document',
-          life: 5000
-        });
-      }
-    });
-    // Reset input so same file can be re-uploaded
-    input.value = '';
+  loadChat(id: string) {
+    this.chatService.loadSession(id);
   }
 
-  clearIndex(): void {
-    if (confirm('Are you sure you want to clear the entire knowledge base and all chat history? This action cannot be undone.')) {
-      this.docService.clearIndex().subscribe({
-        next: () => {
-          this.messageService.add({
-            severity: 'info',
-            summary: 'System Reset',
-            detail: 'Knowledge base and history purged successfully.',
-            life: 5000
-          });
-        },
-        error: (err) => {
-          this.messageService.add({
-            severity: 'error',
-            summary: 'Clear Failed',
-            detail: 'Could not purge the index.',
-            life: 5000
-          });
-        }
-      });
+  deleteChat(event: Event, id: string) {
+    event.stopPropagation();
+    if (confirm('Delete this chat permanently?')) {
+      this.historyService.deleteSession(id);
     }
   }
 }

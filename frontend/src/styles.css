@@ -2,42 +2,39 @@
 @import "primeicons/primeicons.css";
 
 @theme {
-  /* 🎨 Primary Palette — Minimalist Neutral (z.ai Style) */
+  /* Primary Palette — Minimalist Neutral (z.ai Style) */
   --color-bg-main: #FAFAFA;
   --color-bg-soft: #F5F5F5;
   --color-panel: #FFFFFF;
 
-  /* ⚫ Minimal Accent (Near-Black) */
+  /* Minimal Accent (Near-Black) */
   --color-accent: #171717;
   --color-accent-strong: #000000;
   --color-accent-glow: rgba(0, 0, 0, 0.08);
   --color-accent-soft: rgba(0, 0, 0, 0.03);
 
-  /* ⚪ Pure Grayscale Text */
+  /* Pure Grayscale Text */
   --color-text-primary: #171717;
   --color-text-secondary: #737373;
   --color-text-muted: #A3A3A3;
 
-  /* 🧱 Pure Gray Borders / Lines */
+  /* Pure Gray Borders / Lines */
   --color-border: #E5E5E5;
   --color-border-soft: #D4D4D4;
 }
 
 /* ── CSS Reset ─────────────────────────────── */
 
-/* 1. Use a more-intuitive box-sizing model */
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
 
-/* 2. Remove default margin */
 *:not(dialog) {
   margin: 0;
 }
 
-/* 3. Enable keyword animations */
 @media (prefers-reduced-motion: no-preference) {
   html {
     interpolate-size: allow-keywords;
@@ -45,9 +42,7 @@
 }
 
 body {
-  /* 4. Increase line-height */
   line-height: 1.5;
-  /* 5. Improve text rendering */
   -webkit-font-smoothing: antialiased;
   background: var(--color-bg-main);
   color: var(--color-text-primary);
@@ -56,7 +51,6 @@ body {
   overflow: hidden;
 }
 
-/* 6. Improve media defaults */
 img,
 picture,
 video,
@@ -66,7 +60,6 @@ svg {
   max-width: 100%;
 }
 
-/* 7. Inherit fonts for form controls */
 input,
 button,
 textarea,
@@ -74,7 +67,6 @@ select {
   font: inherit;
 }
 
-/* 8. Avoid text overflows */
 p,
 h1,
 h2,
@@ -85,7 +77,6 @@ h6 {
   overflow-wrap: break-word;
 }
 
-/* 9. Improve line wrapping */
 p {
   text-wrap: pretty;
 }
@@ -99,7 +90,6 @@ h6 {
   text-wrap: balance;
 }
 
-/* 10. Create a root stacking context (Angular root is app-root) */
 app-root {
   isolation: isolate;
   display: block;
@@ -127,7 +117,7 @@ app-root {
 
 /* ── Global Utility Classes ──────────────────── */
 .focus-ring {
-  box-shadow: 0 0 0 1px var(--color-accent), 0 0 12px var(--color-accent-glow);
+  box-shadow: 0 0 0 2px var(--color-panel), 0 0 0 4px var(--color-border);
 }
 
 .text-primary {
@@ -162,22 +152,22 @@ app-root {
   border-color: var(--color-border);
 }
 
-/* ── PrimeNG Overrides (New Style Guide) ─────── */
+/* ── PrimeNG Overrides ─────── */
 .p-button {
   font-family: inherit !important;
   border-radius: 8px !important;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition: all 0.15s ease !important;
 }
 
 .p-button-secondary {
-  background: transparent !important;
-  border: 1px solid var(--color-border-soft) !important;
+  background: var(--color-panel) !important;
+  border: 1px solid var(--color-border) !important;
   color: var(--color-text-secondary) !important;
 }
 
 .p-button-secondary:hover {
-  background: var(--color-accent-soft) !important;
-  border-color: var(--color-accent) !important;
+  background: var(--color-bg-soft) !important;
+  border-color: var(--color-border-soft) !important;
   color: var(--color-text-primary) !important;
 }
 
@@ -205,26 +195,26 @@ textarea.p-textarea:focus,
   background: transparent !important;
   border: 1px solid var(--color-border) !important;
   color: var(--color-text-secondary) !important;
-  border-radius: 20px !important;
+  border-radius: 6px !important;
   font-size: 11px !important;
   padding: 4px 10px !important;
 }
 
 .p-chip:hover {
-  background: var(--color-accent-soft) !important;
-  border-color: var(--color-accent) !important;
-  color: var(--color-accent) !important;
+  background: var(--color-bg-soft) !important;
+  border-color: var(--color-border-soft) !important;
+  color: var(--color-text-primary) !important;
 }
 
 .p-drawer {
-  background: var(--color-bg-main) !important;
+  background: var(--color-panel) !important;
   border-color: var(--color-border) !important;
 }
 
 .p-dialog {
   background: var(--color-panel) !important;
   border: 1px solid var(--color-border) !important;
-  border-radius: 16px !important;
+  border-radius: 12px !important;
 }
 
 /* ── Chat Specific Globals ──────────────────── */
@@ -249,8 +239,8 @@ textarea.p-textarea:focus,
 .stream-cursor {
   display: inline-block;
   width: 2px;
-  height: 15px;
-  background: var(--color-accent);
+  height: 16px;
+  background: var(--color-text-primary);
   vertical-align: middle;
   margin-left: 2px;
   animation: blink 0.9s step-end infinite;
@@ -258,11 +248,11 @@ textarea.p-textarea:focus,
 
 /* ── Animations ───────────────────────────────── */
 .animate-fade-in {
-  animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: fadeIn 0.3s ease forwards;
 }
 
 .animate-slide-up {
-  animation: slideUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: slideUp 0.4s ease forwards;
 }
 
 @keyframes fadeIn {
@@ -278,7 +268,7 @@ textarea.p-textarea:focus,
 @keyframes slideUp {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(8px);
   }
 
   to {
@@ -301,7 +291,7 @@ textarea.p-textarea:focus,
 
 /* ── Loading Spinner Override ───────────────── */
 .p-progressspinner-circle {
-  stroke: var(--color-accent) !important;
+  stroke: var(--color-text-secondary) !important;
 }
 
 /* ── Markdown Prose Styles (ngx-markdown) ──── */
@@ -319,18 +309,18 @@ app-message-item .msg-assistant markdown p {
 .prose-assistant markdown h3,
 .prose-assistant markdown h4 {
   color: var(--color-text-primary);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.3;
   margin-top: 1.25em;
   margin-bottom: 0.5em;
 }
 
 .prose-assistant markdown h1 {
-  font-size: 1.4em;
+  font-size: 1.35em;
 }
 
 .prose-assistant markdown h2 {
-  font-size: 1.2em;
+  font-size: 1.15em;
 }
 
 .prose-assistant markdown h3 {
@@ -361,7 +351,7 @@ app-message-item .msg-assistant markdown p {
 .prose-assistant markdown strong,
 .prose-assistant markdown b {
   color: var(--color-text-primary);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .prose-assistant markdown em,
@@ -381,9 +371,9 @@ app-message-item .msg-assistant markdown p {
 }
 
 .prose-assistant markdown pre {
-  background: var(--color-panel);
-  border: 1px solid var(--color-border-soft);
-  border-radius: 10px;
+  background: var(--color-bg-soft);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
   padding: 14px 18px;
   overflow-x: auto;
   margin: 0.75em 0;
@@ -398,7 +388,7 @@ app-message-item .msg-assistant markdown p {
 }
 
 .prose-assistant markdown blockquote {
-  border-left: 3px solid var(--color-accent);
+  border-left: 3px solid var(--color-border-soft);
   padding-left: 12px;
   color: var(--color-text-secondary);
   margin: 0.75em 0;
@@ -406,13 +396,14 @@ app-message-item .msg-assistant markdown p {
 }
 
 .prose-assistant markdown a {
-  color: var(--color-accent);
+  color: var(--color-text-primary);
   text-decoration: underline;
   text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
 }
 
 .prose-assistant markdown a:hover {
-  color: var(--color-accent-strong);
+  color: var(--color-text-secondary);
 }
 
 .prose-assistant markdown hr {
@@ -436,24 +427,23 @@ app-message-item .msg-assistant markdown p {
 }
 
 .prose-assistant markdown th {
-  background: var(--color-panel);
-  color: var(--color-accent);
-  font-weight: 700;
+  background: var(--color-bg-soft);
+  color: var(--color-text-primary);
+  font-weight: 600;
 }
 
-/* ── PrimeNG Select (v21) Dark Styling ──────────────── */
+/* ── PrimeNG Select (v21) ──────────────── */
 .p-select {
   background: var(--color-bg-soft) !important;
   border: 1px solid var(--color-border-soft) !important;
-  border-radius: 20px !important;
-  transition: all 0.2s ease !important;
+  border-radius: 8px !important;
+  transition: all 0.15s ease !important;
   min-height: 32px !important;
   width: auto !important;
 }
 
 .p-select:hover {
-  border-color: var(--color-accent) !important;
-  background: var(--color-accent-soft) !important;
+  border-color: var(--color-border-soft) !important;
 }
 
 .p-select-label {
@@ -462,7 +452,7 @@ app-message-item .msg-assistant markdown p {
   padding: 4px 14px !important;
   display: flex !important;
   align-items: center !important;
-  font-weight: 500 !important;
+  font-weight: 400 !important;
 }
 
 .p-select-dropdown {
@@ -474,8 +464,8 @@ app-message-item .msg-assistant markdown p {
 .p-select-panel {
   background: var(--color-panel) !important;
   border: 1px solid var(--color-border) !important;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08) !important;
-  border-radius: 12px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06), 0 1px 4px rgba(0, 0, 0, 0.04) !important;
+  border-radius: 8px !important;
   padding: 4px !important;
   margin-top: 4px !important;
 }
@@ -492,9 +482,9 @@ app-message-item .msg-assistant markdown p {
   color: var(--color-text-secondary) !important;
   font-size: 13px !important;
   padding: 8px 12px !important;
-  border-radius: 8px !important;
+  border-radius: 6px !important;
   margin-bottom: 2px !important;
-  transition: all 0.15s ease !important;
+  transition: all 0.1s ease !important;
 }
 
 .p-select-option:last-child {
@@ -502,16 +492,17 @@ app-message-item .msg-assistant markdown p {
 }
 
 .p-select-option.p-select-option-selected {
-  background: var(--color-accent-soft) !important;
-  color: var(--color-accent) !important;
+  background: var(--color-bg-soft) !important;
+  color: var(--color-text-primary) !important;
+  font-weight: 500 !important;
 }
 
 .p-select-option:not(.p-select-option-selected):not(.p-disabled).p-focus {
-  background: var(--color-border-soft) !important;
+  background: var(--color-bg-soft) !important;
   color: var(--color-text-primary) !important;
 }
 
 .p-select-option:hover:not(.p-select-option-selected) {
-  background: var(--color-border-soft) !important;
+  background: var(--color-bg-soft) !important;
   color: var(--color-text-primary) !important;
 }

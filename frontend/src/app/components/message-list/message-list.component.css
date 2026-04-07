@@ -15,9 +15,9 @@
 }
 
 .prompt-chip:hover {
-  background-color: var(--color-accent-soft) !important;
-  border-color: var(--color-accent) !important;
-  box-shadow: 0 4px 12px var(--color-accent-glow);
+  background-color: var(--color-bg-soft) !important;
+  border-color: var(--color-border-soft) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
   transform: translateY(-1px);
 }
 

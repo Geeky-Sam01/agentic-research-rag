@@ -3,29 +3,29 @@
   border-width: 1px !important;
   border-style: solid !important;
   border-color: var(--color-border) !important;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition: all 0.15s ease !important;
 }
 
 .source-item:hover {
-  border-color: var(--color-text-muted) !important;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  border-color: var(--color-border-soft) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
 .file-icon-box {
   background-color: var(--color-bg-soft) !important;
   border-color: var(--color-border) !important;
-  transition: all 0.3s ease-in-out !important;
+  transition: all 0.15s ease !important;
 }
 
 .status-dot {
   background-color: #22c55e !important;
-  box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
+  box-shadow: none;
 }
 
 .check-box {
-  color: var(--color-accent) !important;
+  color: var(--color-text-primary) !important;
 }
 
 .text-accent {
-  color: var(--color-accent) !important;
+  color: var(--color-text-primary) !important;
 }

@@ -4,24 +4,28 @@
 
 .centered-wrapper {
   width: 100%;
-  max-width: 720px;
+  max-width: 680px;
   margin: 0 auto;
 }
 
 .centered-box {
   background: var(--color-panel);
   border: 1px solid var(--color-border);
-  border-radius: 16px;
-  padding: 16px 20px 12px 20px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  border-radius: 12px;
+  padding: 14px 16px 10px 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-/* Always-on glow (like reference image) */
-/* Removed centered-glow-always */
+/* Focus state — clean border, no glow */
+.centered-glow-always {
+  border-color: var(--color-border-soft) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.03) !important;
+}
 
 .centered-textarea-row {
   width: 100%;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .centered-textarea {
@@ -32,18 +36,18 @@
   box-shadow: none !important;
   resize: none !important;
   color: var(--color-text-primary) !important;
-  font-size: 17px !important;
+  font-size: 15px !important;
   font-weight: 400;
   line-height: 1.5;
-  min-height: 28px;
+  min-height: 24px;
   max-height: 200px;
   padding: 0 !important;
 }
 
 .centered-textarea::placeholder {
   color: var(--color-text-muted) !important;
-  font-weight: 300;
-  letter-spacing: 0.3px;
+  font-weight: 400;
+  letter-spacing: normal;
 }
 
 /* — Action bar row — */
@@ -57,58 +61,58 @@
 .centered-chips {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .chip-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 1px solid var(--color-border-soft);
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   font-size: 13px;
 }
 
 .chip-icon:hover {
-  background: var(--color-accent-soft);
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: var(--color-bg-soft);
+  border-color: var(--color-border-soft);
+  color: var(--color-text-primary);
 }
 
 .chip-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
-  border-radius: 20px;
-  border: 1px solid var(--color-border-soft);
+  padding: 5px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
   background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
 }
 
 .chip-pill i {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--color-text-muted);
 }
 
 .chip-pill:hover {
-  background: var(--color-accent-soft);
-  border-color: var(--color-accent);
+  background: var(--color-bg-soft);
+  border-color: var(--color-border-soft);
   color: var(--color-text-primary);
 }
 
 .chip-pill:hover i {
-  color: var(--color-accent);
+  color: var(--color-text-primary);
 }
 
 /* — Send button (centered) — */
@@ -116,15 +120,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  border: 1px solid var(--color-border-soft);
-  background: var(--color-border);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-panel);
   color: var(--color-text-muted);
   cursor: not-allowed;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  font-size: 15px;
+  transition: all 0.15s ease;
+  font-size: 14px;
   flex-shrink: 0;
 }
 
@@ -133,16 +137,26 @@
   border-color: #171717 !important;
   color: #FFFFFF !important;
   cursor: pointer !important;
-  box-shadow: none !important;
+  box-shadow: none;
 }
 
 .centered-send.can-send:hover {
-  filter: brightness(1.12);
-  box-shadow: 0 0 24px var(--color-accent-glow);
-  transform: scale(1.06);
+  opacity: 0.85;
+  transform: scale(1.04);
 }
 
-/* Removed centered-glow-line and dot */
+/* — Glow line removed — replaced with subtle divider */
+.centered-glow-line {
+  width: 100%;
+  height: 1px;
+  margin-top: 14px;
+  background: var(--color-border-soft);
+  position: relative;
+}
+
+.centered-glow-line::after {
+  content: none;
+}
 
 
 /* ══════════════════════════════════════════════
@@ -151,7 +165,7 @@
 
 .bottom-wrapper {
   flex-shrink: 0;
-  padding: 16px 24px 20px;
+  padding: 12px 24px 16px;
   background: transparent;
   display: flex;
   flex-direction: column;
@@ -162,50 +176,51 @@
 
 .bottom-inner {
   width: 100%;
-  max-width: 1024px;
+  max-width: 900px;
 }
 
-/* — Google Search Style Input — */
+/* — Clean input bar (z.ai style) — */
 .google-search-bar {
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  border-radius: 999px; /* Pill shape */
+  border-radius: 12px;
   padding: 8px 12px 8px 16px;
   background: var(--color-panel);
   border: 1px solid var(--color-border);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .google-search-bar.is-large {
-  border-radius: 24px !important;
+  border-radius: 16px !important;
   flex-direction: column;
-  padding: 16px 20px 8px 20px;
+  padding: 14px 16px 8px 16px;
   align-items: stretch;
 }
 
 .google-search-bar.active-focus {
   border-color: var(--color-border-soft) !important;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08) !important;
 }
 
 .gsb-plus {
   flex-shrink: 0;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  border-radius: 8px;
   border: none;
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
 }
 
 .gsb-plus:hover {
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--color-bg-soft);
   color: var(--color-text-primary);
 }
 
@@ -217,16 +232,16 @@
   box-shadow: none !important;
   resize: none !important;
   color: var(--color-text-primary) !important;
-  font-size: 15px;
+  font-size: 14.5px;
   line-height: 1.5;
   padding: 6px 0 !important;
-  min-height: 24px;
+  min-height: 22px;
   max-height: 180px;
 }
 
 .google-search-bar.is-large .gsb-textarea {
-  font-size: 16px;
-  min-height: 60px;
+  font-size: 15px;
+  min-height: 56px;
 }
 
 .gsb-textarea::placeholder {
@@ -244,7 +259,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  border-top: 1px solid var(--color-border-soft);
   margin-top: 10px;
   padding-top: 10px;
   width: 100%;
@@ -258,35 +273,35 @@
 
 .google-search-bar.is-large .gsb-plus {
   position: absolute;
-  top: 16px;
-  left: 20px;
-  display: none; /* Hide plus when large to keep it clean, or move to actions? */
+  top: 14px;
+  left: 16px;
+  display: none;
 }
 
 .gsb-icon-btn {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  border-radius: 8px;
   border: none;
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
 }
 
 .gsb-icon-btn:hover {
-  background: rgba(0, 0, 0, 0.05);
-  color: var(--color-accent);
+  background: var(--color-bg-soft);
+  color: var(--color-text-primary);
 }
 
 .v-separator {
   width: 1px;
   height: 16px;
   background: var(--color-border);
-  margin: 0 4px;
+  margin: 0 2px;
 }
 
 :host ::ng-deep .gsb-model-select .p-select {
@@ -294,17 +309,17 @@
   border: none !important;
   box-shadow: none !important;
   padding: 0 8px !important;
-  height: 32px !important;
-  min-width: 120px !important;
+  height: 30px !important;
+  min-width: 110px !important;
 }
 
 :host ::ng-deep .gsb-model-select .p-select:hover {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border-radius: 16px !important;
+  background: var(--color-bg-soft) !important;
+  border-radius: 8px !important;
 }
 
 :host ::ng-deep .gsb-model-select .p-select .p-select-label {
-  font-size: 13px !important;
+  font-size: 12.5px !important;
   color: var(--color-text-secondary) !important;
   padding: 0 !important;
   display: flex !important;
@@ -312,27 +327,28 @@
 }
 
 .gsb-send {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  border-radius: 8px;
   border: none;
   background: transparent;
   color: var(--color-text-muted);
   cursor: not-allowed;
-  transition: all 0.2s;
+  transition: all 0.15s ease;
 }
 
 .gsb-send.can-send {
-  color: var(--color-accent);
+  background: #171717;
+  color: #FFFFFF !important;
   cursor: pointer;
 }
 
 .gsb-send.can-send:hover {
-  background: var(--color-accent-soft);
-  transform: scale(1.1);
+  background: #404040;
+  transform: none;
 }
 
 /* — Hints — */
@@ -340,36 +356,36 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  margin-top: 10px;
+  gap: 14px;
+  margin-top: 8px;
   font-size: 10px;
   color: var(--color-text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  font-weight: 700;
+  letter-spacing: 0.08em;
+  font-weight: 500;
   user-select: none;
 }
 
 .hint-dot {
-  width: 3px;
-  height: 3px;
+  width: 2px;
+  height: 2px;
   border-radius: 50%;
   background: var(--color-border);
 }
 
-/* — Model Select Refinements — */
+/* — Model Select — */
 .model-select {
   flex-shrink: 0;
 }
 
 :host ::ng-deep .model-select .p-select {
-  border-radius: 20px !important;
-  border-color: var(--color-border-soft) !important;
-  background: rgba(255, 255, 255, 0.03) !important;
+  border-radius: 8px !important;
+  border-color: var(--color-border) !important;
+  background: var(--color-panel) !important;
 }
 
 :host ::ng-deep .model-select .p-select:hover {
-  border-color: var(--color-accent) !important;
+  border-color: var(--color-border-soft) !important;
 }
 
 .bottom-model-select {
@@ -377,15 +393,14 @@
 }
 
 :host ::ng-deep .bottom-model-select .p-select {
-  border-radius: 12px !important;
-  background: var(--color-bg-soft) !important;
-  border-color: var(--color-border-soft) !important;
+  border-radius: 8px !important;
+  background: var(--color-panel) !important;
+  border-color: var(--color-border) !important;
 }
 
 .v-divider {
   width: 1px;
-  height: 20px;
-  background: var(--color-border-soft);
-  margin: 0 4px;
+  height: 18px;
+  background: var(--color-border);
+  margin: 0 2px;
 }
-

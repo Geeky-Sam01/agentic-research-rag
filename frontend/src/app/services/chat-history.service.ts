@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, computed } from '@angular/core';
 import { Message, Chunk } from '../models/chat.models';
 
 export interface ChatSession {
@@ -19,6 +19,66 @@ export class ChatHistoryService {
 
   sessions = signal<ChatSession[]>([]);
   currentSessionId = signal<string | null>(null);
+
+  groupedSessions = computed(() => {
+    const all = this.sessions();
+    const groups: { label: string; sessions: ChatSession[] }[] = [];
+    
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const yesterday = today - 24 * 60 * 60 * 1000;
+    const sevenDaysAgo = today - 7 * 24 * 60 * 60 * 1000;
+
+    const sections: { [key: string]: ChatSession[] } = {};
+
+    all.forEach(session => {
+      const date = new Date(session.timestamp);
+      const sessionDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+      
+      let label = '';
+      if (sessionDay === today) {
+        label = 'Today';
+      } else if (sessionDay === yesterday) {
+        label = 'Yesterday';
+      } else if (sessionDay >= sevenDaysAgo) {
+        label = 'Previous 7 Days';
+      } else if (date.getFullYear() === now.getFullYear()) {
+        label = date.toLocaleString('default', { month: 'long' });
+      } else {
+        label = date.getFullYear().toString();
+      }
+
+      if (!sections[label]) sections[label] = [];
+      sections[label].push(session);
+    });
+
+    // Sort sections or maintain a specific order if needed, but 'all' is already sorted by latest
+    // We want to keep the order in which they appear in 'all'
+    const seenLabels = new Set<string>();
+    all.forEach(session => {
+      const date = new Date(session.timestamp);
+      const sessionDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+      let label = '';
+      if (sessionDay === today) {
+        label = 'Today';
+      } else if (sessionDay === yesterday) {
+        label = 'Yesterday';
+      } else if (sessionDay >= sevenDaysAgo) {
+        label = 'Previous 7 Days';
+      } else if (date.getFullYear() === now.getFullYear()) {
+        label = date.toLocaleString('default', { month: 'long' });
+      } else {
+        label = date.getFullYear().toString();
+      }
+
+      if (!seenLabels.has(label)) {
+        groups.push({ label, sessions: sections[label] });
+        seenLabels.add(label);
+      }
+    });
+
+    return groups;
+  });
 
   constructor() {
     this.dbReady = new Promise((resolve) => {

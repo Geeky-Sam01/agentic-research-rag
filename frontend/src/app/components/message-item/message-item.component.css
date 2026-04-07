@@ -11,9 +11,9 @@
 }
 
 .action-btn:hover {
-  border-color: var(--color-accent) !important;
-  background: var(--color-accent-soft) !important;
-  color: var(--color-accent) !important;
+  border-color: var(--color-border-soft) !important;
+  background: var(--color-bg-soft) !important;
+  color: var(--color-text-primary) !important;
 }
 
 .text-green-500 {
