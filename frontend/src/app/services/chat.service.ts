@@ -56,7 +56,7 @@ export class ChatService {
     this.statusHistory.set([initialStatus]);
     this.updateMessageStatus(assistantId, initialStatus);
 
-    const url = `${this.BASE_URL}/api/chat/query-stream?query=${encodeURIComponent(query)}&model=${this.selectedModel()}`;
+    const url = `${this.BASE_URL}/api/chat/query-stream?query=${encodeURIComponent(query)}`;
     this.eventSource = new EventSource(url);
 
     this.eventSource.onmessage = (event) => {

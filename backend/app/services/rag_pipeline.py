@@ -17,7 +17,7 @@ def get_rag_context(
     Consolidated RAG retrieval pipeline (Steps 1, 2, 3).
     Returns context string and formatted sources.
     """
-    # 🔹 Step 1: SEARCH QDRANT
+    # Step 1: SEARCH QDRANT
     results = query_qdrant(
         query=query,
         client=client,
@@ -32,7 +32,7 @@ def get_rag_context(
             "raw_results_count": 0
         }
 
-    # 🔹 Step 2: Build context (Combining table metadata with text for the LLM)
+    # Step 2: Build context (Combining table metadata with text for the LLM)
     context_parts = []
     for r in results:
         part = f"Source: {r['file']} (Page {r['page']})\nSection: {r['heading']}\n"
@@ -44,7 +44,7 @@ def get_rag_context(
 
     context = "\n\n---\n\n".join(context_parts)
 
-    # 🔹 Step 3: Format Citations (Deduplicated for UI tags)
+    # Step 3: Format Citations (Deduplicated for UI tags)
     sources_payload = []
     seen_sources = set()
     for r in results:

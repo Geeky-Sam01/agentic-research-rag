@@ -17,7 +17,7 @@ def get_scheme_quote(scheme_code: str) -> dict:
     Use this when the user asks for current NAV, latest price,
     or today's mutual fund value.
     """
-    logger.info(f"📊 Fetching scheme quote for: {scheme_code}")
+    logger.info(f"Fetching scheme quote for: {scheme_code}")
     try:
         quote = mf.get_scheme_quote(scheme_code, as_json=False)
         logger.debug(f"Successfully fetched quote for {scheme_code}")
@@ -36,7 +36,7 @@ def search_schemes(amc_name: str) -> dict:
     Use when the user wants to list or discover funds
     from a specific fund house.
     """
-    logger.info(f"🔍 Searching schemes for AMC: {amc_name}")
+    logger.info(f"Searching schemes for AMC: {amc_name}")
     try:
         schemes = mf.get_available_schemes(amc_name)
         if not schemes:
@@ -58,7 +58,7 @@ def search_scheme_by_name(keyword: str) -> dict:
     Use when the user describes a fund type or partial name
     but does not know the specific scheme code.
     """
-    logger.info(f"🔎 Searching schemes by keyword: {keyword}")
+    logger.info(f"Searching schemes by keyword: {keyword}")
     try:
         all_schemes = mf.get_scheme_codes(as_json=False)
         matches = {k: v for k, v in all_schemes.items()
@@ -85,7 +85,7 @@ def get_historical_nav(scheme_code: str) -> dict:
     Use when the user asks about NAV history, historical
     performance, or 52-week high/low of a fund.
     """
-    logger.info(f"📈 Fetching historical NAV for: {scheme_code}")
+    logger.info(f"Fetching historical NAV for: {scheme_code}")
     try:
         result = mf.get_scheme_historical_nav(scheme_code, as_json=False)
         if result is None:
@@ -115,7 +115,7 @@ def calculate_returns(
     Use when the user wants to calculate their mutual fund
     investment returns or profit/loss.
     """
-    logger.info(f"🧮 Calculating returns for code {scheme_code} over {investment_months} months")
+    logger.info(f"Calculating returns for code {scheme_code} over {investment_months} months")
     try:
         result = mf.calculate_returns(
             scheme_code, balance_units, monthly_sip,
@@ -142,7 +142,7 @@ def get_equity_performance(report_date: str = None) -> dict:
     Use when the user asks about equity fund performance,
     best-performing funds, or category-level comparisons.
     """
-    logger.info(f"📊 Fetching equity performance (date: {report_date})")
+    logger.info(f"Fetching equity performance (date: {report_date})")
     try:
         data = mf.get_open_ended_equity_scheme_performance(report_date, as_json=False)
         logger.debug("Equity performance data fetched successfully")
@@ -159,7 +159,7 @@ def get_debt_performance(report_date: str = None) -> dict:
     Returns:
         Dict of debt fund performance metrics.
     """
-    logger.info(f"📊 Fetching debt performance (date: {report_date})")
+    logger.info(f"Fetching debt performance (date: {report_date})")
     try:
         data = mf.get_open_ended_debt_scheme_performance(report_date, as_json=False)
         logger.debug("Debt performance data fetched successfully")
@@ -176,7 +176,7 @@ def get_hybrid_performance(report_date: str = None) -> dict:
     Returns:
         Dict of hybrid fund performance metrics.
     """
-    logger.info(f"📊 Fetching hybrid performance (date: {report_date})")
+    logger.info(f"Fetching hybrid performance (date: {report_date})")
     try:
         data = mf.get_open_ended_hybrid_scheme_performance(report_date, as_json=False)
         logger.debug("Hybrid performance data fetched successfully")
@@ -193,7 +193,7 @@ def read_factsheet(query: str) -> dict:
     Use this when the user asks about the 'how' and 'why' of a fund, 
     or anything defined in its official documentation.
     """
-    logger.info(f"📚 Agent Tool - Reading factsheet for: '{query}'")
+    logger.info(f"Agent Tool - Reading factsheet for: '{query}'")
     try:
         client = get_client()
         rag_data = get_rag_context(query, client, _embedder)

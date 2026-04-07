@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
+from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.api.documents import router as documents_router
 from app.api.chat import router as chat_router
@@ -10,21 +11,23 @@ from app.services.document_processor import init_ocr  # Verifies Tesseract OCR e
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Context manager for startup and shutdown tasks."""
+    logger.info("Starting up Agentic Research RAG API...")
+    init_ocr()
+    yield
+    logger.info("Shutting down Agentic Research RAG API...")
+
 # Initialize FastAPI app
 app = FastAPI(
     title="Agentic Research RAG API",
     description="Python FastAPI RAG system with Qdrant, BGE, and OpenRouter",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
-
-@app.on_event("startup")
-async def startup_event():
-    """Tasks to run on startup: pre-load models, connect DBs, etc."""
-    logger.info("Starting up Agentic Research RAG API...")
-    # Verify document processing is ready
-    init_ocr()
 
 # Add CORS middleware
 app.add_middleware(

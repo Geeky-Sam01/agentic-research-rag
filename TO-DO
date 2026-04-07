@@ -1,0 +1,193 @@
+---
+
+Create a GitHub Actions CI workflow for this Python FastAPI backend. Here are the files to create:
+
+**File: `.github/workflows/ci.yml`**
+
+```yaml
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pip install ruff
+      - name: Run Ruff
+        run: |
+          cd backend
+          ruff check .
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+      - name: Run tests
+        run: |
+          cd backend
+          python -m pytest tests/ -v --tb=short
+```
+
+**File: `backend/pytest.ini`**
+
+```ini
+[pytest]
+testpaths = tests
+pythonpath = .
+asyncio_mode = auto
+```
+
+**File: `backend/tests/__init__.py`**
+
+Empty file.
+
+**File: `backend/tests/test_basic.py`**
+
+```python
+"""Smoke tests — verify imports and config loading."""
+
+import os
+
+# Set required env vars before importing app modules
+os.environ.setdefault("OPENROUTER_API_KEY", "test-key")
+os.environ.setdefault("PORT", "8000")
+os.environ.setdefault("HOST", "0.0.0.0")
+os.environ.setdefault("DEBUG", "false")
+os.environ.setdefault("CORS_ORIGIN", "*")
+os.environ.setdefault("INDEX_PATH", "/tmp/test_indices")
+os.environ.setdefault("UPLOAD_PATH", "/tmp/test_uploads")
+os.environ.setdefault("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+os.environ.setdefault("EMBEDDING_DIM", "384")
+os.environ.setdefault("LLM_MODEL", "openrouter/free")
+
+
+class TestConfig:
+    def test_settings_loads(self):
+        from app.core.config import Settings
+        s = Settings()
+        assert s.PORT == 8000
+        assert s.EMBEDDING_DIM == 384
+        assert s.LLM_MODEL == "openrouter/free"
+
+    def test_settings_has_required_fields(self):
+        from app.core.config import Settings
+        s = Settings()
+        assert s.OPENROUTER_API_KEY is not None
+        assert s.HOST is not None
+        assert s.CORS_ORIGIN is not None
+
+
+class TestSchemas:
+    def test_document_upload_response(self):
+        from app.models.schemas import DocumentUploadResponse
+        r = DocumentUploadResponse(
+            success=True,
+            message="ok",
+            totalIndexed=10,
+            chunksCreated=10,
+            embeddingModel="test",
+            embeddingDimension=384,
+        )
+        assert r.success is True
+        assert r.totalIndexed == 10
+
+    def test_query_request_defaults(self):
+        from app.models.schemas import QueryRequest
+        q = QueryRequest(query="test query")
+        assert q.query == "test query"
+        assert q.stream is True
+
+    def test_finsight_response_fields(self):
+        from app.models.schemas import FinSightResponse
+        assert "blocks" in FinSightResponse.model_fields
+        assert "query" in FinSightResponse.model_fields
+        assert "intent" in FinSightResponse.model_fields
+
+    def test_source_model(self):
+        from app.models.schemas import Source
+        s = Source(text="sample", source="file.pdf", similarity="0.92")
+        assert s.source == "file.pdf"
+
+
+class TestAgentToolsImport:
+    def test_all_tools_import(self):
+        from app.services.agent_tools import ALL_MF_TOOLS
+        assert len(ALL_MF_TOOLS) == 9
+
+    def test_tool_names_unique(self):
+        from app.services.agent_tools import ALL_MF_TOOLS
+        names = [t.name for t in ALL_MF_TOOLS]
+        assert len(names) == len(set(names)), f"Duplicate tool names: {names}"
+
+    def test_tool_descriptions_not_empty(self):
+        from app.services.agent_tools import ALL_MF_TOOLS
+        for t in ALL_MF_TOOLS:
+            assert t.description, f"Tool {t.name} has no description"
+
+
+class TestPrompts:
+    def test_system_prompt_exists(self):
+        from app.services.prompts import MF_RESEARCH_SYSTEM_PROMPT
+        assert isinstance(MF_RESEARCH_SYSTEM_PROMPT, str)
+        assert len(MF_RESEARCH_SYSTEM_PROMPT) > 100
+
+    def test_rag_stream_prompt_exists(self):
+        from app.services.prompts import RAG_STREAM_PROMPT
+        assert isinstance(RAG_STREAM_PROMPT, str)
+```
+
+**Add to `backend/pyproject.toml`:**
+
+```toml
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
+```
+
+**Fix existing bugs before pushing:**
+
+`backend/app/core/llm_clients.py` line 22 — change:
+```python
+# broken:
+fallbacks = ake_llm(m, streaming) for m in fallback_models]
+
+# fixed:
+fallbacks = [make_llm(m, streaming) for m in fallback_models]
+```
+
+Remove from repo:
+```bash
+git rm memory.txt backend/error.txt
+git commit -m "Add CI pipeline, smoke tests, fix typo in llm_clients.py, remove scratch files"
+```

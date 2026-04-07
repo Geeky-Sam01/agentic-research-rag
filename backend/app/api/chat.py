@@ -4,7 +4,7 @@ import logging
 import json
 from typing import Optional
 
-from app.services.injest import get_client
+from app.services.ingest_pipeline import get_client
 from app.services.langchain_agents import run_agent_query, stream_agent_query
 from app.services.llm import generate_answer_structured  # type: ignore
 from app.models.schemas import QueryRequest
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 _qdrant_client = get_client()
 
 @router.get("/query-stream")
-async def query_stream(query: str = Query(...), model: Optional[str] = None):
+async def query_stream(query: str = Query(...)):
     """
     Stream query response using the autonomous research agent.
     The agent dynamically decides between RAG (Factsheets) and live MF API.
@@ -24,7 +24,7 @@ async def query_stream(query: str = Query(...), model: Optional[str] = None):
     if not query or not query.strip():
         raise HTTPException(status_code=400, detail="Query is required")
 
-    logger.info(f"🌊 Agentic Stream Query: \"{query}\"")
+    logger.info(f"Agentic Stream Query: \"{query}\"")
 
     async def event_generator():
         try:
@@ -52,10 +52,10 @@ async def query_stream(query: str = Query(...), model: Optional[str] = None):
                         if isinstance(output, dict) and "sources" in output:
                             sources = output["sources"]
                             yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
-                            logger.info(f"📚 Agent consulted documents: {len(sources)} sources emitted")
+                            logger.info(f"Agent consulted documents: {len(sources)} sources emitted")
 
             yield f"data: {json.dumps({'content': '[DONE]'})}\n\n"
-            logger.info("✅ Agentic stream complete")
+            logger.info("Agentic stream complete")
 
         except Exception as e:
             logger.error(f"Stream error: {e}")
@@ -71,7 +71,7 @@ async def query_structured(request: QueryRequest):
     if not request.query or not request.query.strip():
         raise HTTPException(status_code=400, detail="Query is required")
         
-    logger.info(f"🤖 Agentic Structured Query: \"{request.query}\"")
+    logger.info(f"Agentic Structured Query: \"{request.query}\"")
     
     try:
         # Step 1: Run the autonomous agent to get the ground truth / analysis

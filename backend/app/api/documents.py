@@ -10,7 +10,7 @@ from app.services.qdrant_service import (
     get_client, ensure_collection, delete_document, 
     get_collection_stats, clear_collection
 )
-from app.services.injest import ingest_file
+from app.services.ingest_pipeline import ingest_file
 from sentence_transformers import SentenceTransformer  # type: ignore
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,16 @@ async def upload_document(
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
  
-    logger.info(f"📄 Received: {file.filename}  [{doc_type} / {fund_name} / {period}]")
+    # ── File Type Validation ──────────────────────────────────────────
+    allowed_extensions = {".pdf", ".txt", ".md"}
+    file_ext = Path(file.filename).suffix.lower()
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Unsupported file type '{file_ext}'. Allowed: {', '.join(allowed_extensions)}"
+        )
+ 
+    logger.info(f"Received: {file.filename}  [{doc_type} / {fund_name} / {period}]")
  
     file_path = Path(settings.UPLOAD_PATH) / file.filename
  
@@ -62,12 +71,12 @@ async def upload_document(
  
         
         if overwrite:
-            logger.info(f"🗑️  Overwrite=True — deleting existing points for {file.filename}")
+            logger.info(f"Overwrite=True -- deleting existing points for {file.filename}")
             delete_document(file.filename, _qdrant_client)
  
         
         #       extract → chunk → embed → upsert
-        logger.info("🚀 Running ingest pipeline...")
+        logger.info("Running ingest pipeline...")
         total_indexed, extracted_doc = ingest_file(
             file_path = str(file_path),
             fund_name = fund_name,
@@ -87,7 +96,7 @@ async def upload_document(
         from app.services.smart_questions import generate_smart_questions
         suggested_qs = generate_smart_questions(extracted_doc, fund_name)
 
-        logger.info(f"✅ Indexed {total_indexed} chunks from {file.filename}")
+        logger.info(f"Indexed {total_indexed} chunks from {file.filename}")
 
         return DocumentUploadResponse(
             success            = True,
