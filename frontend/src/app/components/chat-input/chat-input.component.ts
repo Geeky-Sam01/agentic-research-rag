@@ -6,10 +6,12 @@ import { TextareaModule } from 'primeng/textarea';
 import { ButtonModule } from 'primeng/button';
 import { ChatService } from '../../services/chat.service';
 
+import { CommonModule } from '@angular/common';
+
 @Component({
   selector: 'app-chat-input',
   standalone: true,
-  imports: [FormsModule, ButtonModule, Select, TextareaModule],
+  imports: [CommonModule, FormsModule, ButtonModule, Select, TextareaModule],
   templateUrl: './chat-input.component.html',
   styleUrl: './chat-input.component.css'
 })
@@ -52,6 +54,10 @@ export class ChatInputComponent {
       event.preventDefault();
       this.sendMessage();
     }
+  }
+
+  isLarge(): boolean {
+    return this.inputValue.length > 60 || this.inputValue.includes('\n');
   }
 
   sendMessage(): void {

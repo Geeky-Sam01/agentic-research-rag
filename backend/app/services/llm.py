@@ -1,7 +1,7 @@
 import logging
 from typing import AsyncGenerator, Optional, List
 
-from pydantic import BaseModel, Field
+
 from langchain_core.output_parsers import StrOutputParser
 from app.core.config import settings
 from app.core.llm_clients import get_llm_with_fallbacks
@@ -11,37 +11,7 @@ from app.services.response_parser import parse_rag_response, SummaryCard
 logger = logging.getLogger(__name__)
 
 
-from typing import Literal
-
-# ── 1. Define the Schema the LLM must follow ──────────────────────────────
-class MetricItem(BaseModel):
-    label: str = Field(description="Name of the metric")
-    value: str = Field(description="Numeric or categorical value of the metric")
-    unit: Optional[str] = Field(default=None, description="Optional unit (e.g., %, USD)")
-
-class MetricBlock(BaseModel):
-    type: Literal["metric"]
-    title: str = Field(description="Title of the metric group")
-    data: List[MetricItem] = Field(description="List of metric data points")
-
-class TableBlock(BaseModel):
-    type: Literal["table"]
-    title: str = Field(description="Title of the table")
-    columns: List[str] = Field(description="List of column headers")
-    rows: List[List[str]] = Field(description="Table rows")
-
-class SummaryBlock(BaseModel):
-    type: Literal["summary"]
-    title: str = Field(description="Title of the summary")
-    text: str = Field(description="Text content of the summary")
-
-Block = MetricBlock | TableBlock | SummaryBlock
-
-class FinSightResponse(BaseModel):
-    query: str = Field(description="The user's original query")
-    intent: str = Field(description="Underlying intent of the query")
-    confidence: float = Field(description="Confidence score between 0 and 1")
-    blocks: List[Block] = Field(description="Extracted financial insight blocks")
+from app.models.schemas import FinSightResponse
 
 # ── 2. Streaming (Unchanged) ──────────────────────────────────────────────
 async def generate_answer_stream(
@@ -76,7 +46,6 @@ async def generate_answer_structured(
     primary = model_override if model_override else settings.LLM_MODEL
     llm = get_llm_with_fallbacks(primary, streaming=False).bind(temperature=0.1)
     
-    # ⚡ THE MAGIC LINE: Bind the Pydantic schema with strict mode
     structured_llm = llm.with_structured_output(FinSightResponse, strict=True)
     
     chain = RAG_STRUCTURED_PROMPT | structured_llm

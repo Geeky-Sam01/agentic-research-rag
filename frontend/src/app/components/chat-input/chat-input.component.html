@@ -3,7 +3,7 @@
      ═══════════════════════════════════════════════════ -->
 @if (isCentered) {
   <div class="centered-wrapper">
-    <div class="centered-box centered-glow-always">
+    <div class="centered-box centered-glow-always" [class.is-large]="isLarge()">
 
       <!-- Textarea row -->
       <div class="centered-textarea-row">
@@ -12,7 +12,7 @@
           [autoResize]="true"
           [rows]="1"
           [disabled]="chatService.loading()"
-          placeholder="Press Enter to search documents"
+          [placeholder]="isStructuredMode ? 'Structured Mode: Extract metrics and data tables...' : 'Explainer Mode: Ask financial questions...'"
           class="centered-textarea"
           spellcheck="false"
           autocomplete="off"
@@ -42,14 +42,14 @@
             <i class="pi pi-globe"></i>
             <span>Deep Search</span>
           </button>
-          <button class="chip-pill" 
-                  [class.text-accent]="isStructuredMode"
-                  [class.border-accent]="isStructuredMode"
-                  (click)="toggleStructuredMode()"
-                  title="Toggle JSON Structured Outputs (Tables/Cards)">
-            <i class="pi pi-th-large"></i>
-            <span>{{ isStructuredMode ? 'Structured' : 'Markdown' }}</span>
-          </button>
+          <div class="flex items-center gap-1.5 cursor-pointer text-xs font-bold uppercase tracking-wider transition-all select-none px-2" 
+               [class.text-accent]="isStructuredMode"
+               [class.text-text-muted]="!isStructuredMode"
+               (click)="toggleStructuredMode()"
+               title="Toggle JSON Structured Outputs (Tables/Cards)">
+            <i class="pi text-base" [class.pi-toggle-on]="isStructuredMode" [class.pi-toggle-off]="!isStructuredMode"></i>
+            <span>{{ isStructuredMode ? 'Structured Mode' : 'Explainer Mode' }}</span>
+          </div>
         </div>
 
         <!-- Right: send button -->
@@ -79,12 +79,14 @@
     <div class="bottom-inner">
       <div class="google-search-bar"
            [class.active-focus]="focused()"
-           [class.border-accent]="focused()">
+           [class.border-accent]="focused()"
+           [class.is-large]="isLarge()">
         
-        <!-- Left Addition (+ Icon style) -->
-        <button class="gsb-plus" title="Add file">
-          <i class="pi pi-plus text-sm"></i>
-        </button>
+        @if (!isLarge()) {
+          <button class="gsb-plus" title="Add file">
+            <i class="pi pi-plus text-sm"></i>
+          </button>
+        }
 
         <!-- Main Textarea -->
         <textarea pInputTextarea
@@ -92,7 +94,7 @@
           [autoResize]="true"
           [rows]="1"
           [disabled]="chatService.loading()"
-          placeholder="Ask anything..."
+          [placeholder]="isStructuredMode ? 'Structured Mode: Request metrics, tables, and structured insights...' : 'Explainer Mode: Ask anything...'"
           class="gsb-textarea"
           spellcheck="false"
           autocomplete="off"
@@ -101,41 +103,50 @@
           (keydown)="onKeydown($event)"
         ></textarea>
 
-        <!-- Right Icons Group -->
+        <!-- Right Icons Group (Grouped on right when large) -->
         <div class="gsb-actions">
-          <button class="gsb-icon-btn" title="Deep Search">
-            <i class="pi pi-globe text-base"></i>
-          </button>
-          
-          <button class="gsb-icon-btn" 
-                  [class.text-accent]="isStructuredMode" 
-                  (click)="toggleStructuredMode()"
-                  title="Toggle JSON Structured Outputs (Tables/Cards)">
-            <i class="pi pi-th-large text-base"></i>
-          </button>
+          @if (isLarge()) {
+            <button class="gsb-icon-btn" title="Add file">
+              <i class="pi pi-plus text-sm"></i>
+            </button>
+          }
 
-          <div class="v-separator"></div>
-
-          <!-- Model Select (Google Style Dropdown) -->
-          <p-select [options]="models" 
-                   [(ngModel)]="selectedModel" 
-                   optionLabel="label" 
-                   optionValue="value"
-                   class="gsb-model-select"
-                   [appendTo]="'body'">
-          </p-select>
-
-          <!-- Integrated Send Button -->
-          <button class="gsb-send"
-                  [class.can-send]="canSend()"
-                  [disabled]="!canSend()"
-                  (click)="sendMessage()">
-            @if (chatService.loading()) {
-              <i class="pi pi-spin pi-spinner text-sm"></i>
-            } @else {
-              <i class="pi pi-send text-sm"></i>
-            }
-          </button>
+          <div class="gsb-actions-group">
+            <button class="gsb-icon-btn" title="Deep Search">
+              <i class="pi pi-globe text-base"></i>
+            </button>
+            
+            <div class="flex items-center gap-1.5 cursor-pointer text-[11px] font-bold uppercase tracking-wider transition-all select-none px-1"
+                 [ngClass]="isStructuredMode ? 'text-accent' : 'text-text-muted hover:text-text-primary'"
+                 (click)="toggleStructuredMode()"
+                 title="Toggle Output Architecture">
+              <i class="pi text-base" [ngClass]="isStructuredMode ? 'pi-toggle-on' : 'pi-toggle-off'"></i>
+              <span>{{ isStructuredMode ? 'Structured Mode' : 'Explainer Mode' }}</span>
+            </div>
+  
+            <div class="v-separator"></div>
+  
+            <!-- Model Select (Google Style Dropdown) -->
+            <p-select [options]="models" 
+                     [(ngModel)]="selectedModel" 
+                     optionLabel="label" 
+                     optionValue="value"
+                     class="gsb-model-select"
+                     [appendTo]="'body'">
+            </p-select>
+  
+            <!-- Integrated Send Button -->
+            <button class="gsb-send"
+                    [class.can-send]="canSend()"
+                    [disabled]="!canSend()"
+                    (click)="sendMessage()">
+              @if (chatService.loading()) {
+                <i class="pi pi-spin pi-spinner text-sm"></i>
+              } @else {
+                <i class="pi pi-send text-sm"></i>
+              }
+            </button>
+          </div>
         </div>
       </div>
 
