@@ -2,6 +2,7 @@ import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap, catchError, throwError } from 'rxjs';
 import { ChatHistoryService } from './chat-history.service';
+import { environment } from '../../environments/environment';
 
 export type UploadStatus = 'idle' | 'uploading' | 'done' | 'error';
 
@@ -15,7 +16,7 @@ export class DocumentService {
 
   private http = inject(HttpClient);
   private historyService = inject(ChatHistoryService);
-  private readonly BASE_URL = 'http://localhost:8000';
+  private readonly BASE_URL = environment.apiUrl;
 
   showToast(msg: string) {
     this.toastMessage.set(msg);

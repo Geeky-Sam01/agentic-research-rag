@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Message, Chunk, Source } from '../models/chat.models';
 import { DocumentService } from './document.service';
 import { ChatHistoryService } from './chat-history.service';
+import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
 export class ChatService {
@@ -18,7 +19,7 @@ export class ChatService {
   private docService = inject(DocumentService);
   private historyService = inject(ChatHistoryService);
   private eventSource: EventSource | null = null;
-  private readonly BASE_URL = 'http://localhost:8000';
+  private readonly BASE_URL = environment.apiUrl;
 
   async sendQuery(query: string) {
     return this.streamChat(query);
