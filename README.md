@@ -1,101 +1,118 @@
-# Agentic Research RAG
+# 🔍 FinSight: Agentic Financial Research RAG
 
-A seamless, highly advanced Retrieval-Augmented Generation (RAG) system composed of a Python **FastAPI Backend** and an **Angular 20 Frontend** interface.
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Angular](https://img.shields.io/badge/Frontend-Angular%2021-DD0031?style=flat-square&logo=angular&logoColor=white)](https://angular.io/)
+[![LangChain](https://img.shields.io/badge/Agent-LangGraph-00ADFF?style=flat-square&logo=langchain&logoColor=white)](https://langchain.com/)
+[![VectorDB](https://img.shields.io/badge/VectorDB-Qdrant-FF4B4B?style=flat-square&logo=qdrant&logoColor=white)](https://qdrant.tech/)
 
----
-
-## Technical Features Overview
-
-### Backend Architecture
-The backend is a robust API driving the core RAG logic. Below are the key working features implemented:
-
-- **Parent Document Retrieval (PDR) Chunking:** 
-  A highly accurate retrieval strategy. The system intelligently breaks documents down into small "child chunks" strictly for semantic similarity search, but stores their corresponding large "parent chunks." When a user asks a query, the model finds the most accurate point, but the LLM receives the full surrounding macro-context.
-  
-- **Local Embedded Vectors:** 
-  Using `sentence-transformers/all-MiniLM-L6-v2` locally to accurately represent content mathematically without sending your documents blindly to an embedding API provider. 
-
-- **Efficient Vector Storage Database:** 
-  Using `FAISS` to store embeddings locally in a highly optimized vector space map (`documents.index`) alongside a strongly-typed hierarchical structure JSON mapping (`metadata.json`).
-
-- **OpenRouter LLM Integration:**
-  Dynamically integrates with OpenRouter's massive list of AI endpoints (currently configured to hit `stepfun/step-3.5-flash:free`). Full support strictly mapping the `X-OpenRouter-Title` headers for tracking.
-
-- **Fast Streaming:**
-  SSE (Server-Sent Events) built directly into the core query functionality meaning the user interface receives the first token in milliseconds as opposed to waiting seconds for an entire generation to complete.
-
-- **Strict Environment Safety:**
-  Completely decoupled settings loading structure checking natively for an explicit `.env` file upon startup and crashing fast ensuring API keys are never accidentally hardcoded in generic files.
-
-### Working API Endpoints
-
-Explore these endpoints interactively via the built-in Swagger UI by visiting: `http://127.0.0.1:8000/docs`
-
-**Document Management:**
-- `POST /api/documents/upload`: Upload `.txt`, `.md`, or `.pdf` files. Triggers PDR and locally generates FAISS vectors.
-- `GET /api/documents/stats`: See indexing counts, source lists, and dimension sizes.
-- `DELETE /api/documents/clear`: Perform a hard wipe of the entire local vector datastore.
-
-**Chat & Generation:**
-- `POST /api/chat/query`: Submit a query and receive a block JSON response with the final answer & sources.
-- `GET /api/chat/query-stream`: Stream a response using server-sent events for a real-time typing effect.
+**FinSight** is an autonomous financial research assistant that combines deep document analysis with live market data retrieval. Built on an agentic RAG pipeline, it doesn't just find information—it researches, verifies, and synthesizes analytical answers.
 
 ---
 
-## Setup & Running
+## 🌟 Flagship Features
 
-### 1. Backend
-
-We utilize `uv` to maintain lightning-fast virtual environments and run the necessary backend dependencies.
-
-#### Installation
-```cmd
-cd backend
-uv venv
-.\.venv\Scripts\activate
-uv pip install -r requirements.txt
-```
-
-#### Configuration
-In the `backend/` directory, create a `.env` file (you can copy `.env.example`).
-Include your required identifiers:
-```env
-OPENROUTER_API_KEY=your_key_here
-PORT=8000
-HOST=127.0.0.1
-DEBUG=False
-CORS_ORIGIN=*
-INDEX_PATH=indices
-UPLOAD_PATH=uploads
-EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
-EMBEDDING_DIM=384
-LLM_MODEL=stepfun/step-3.5-flash:free
-```
-
-#### Starting the Server
-You no longer need to type out massive loading commands. Use our specialized startup scripts depending upon your preferred shell:
-
-**PowerShell (`.ps1`)**:
-```powershell
-cd backend
-.\run_backend.ps1
-```
-
-**Command Prompt (`.bat`)**:
-```cmd
-cd backend
-.\run_backend.bat  (or simply double click this file)
-```
-*Note: Both scripts will safely kill any lingering process holding port 8000, verify the existence of your `.venv`, activate it for you, and automatically spool up the Uvicorn server.*
+| Feature | Description |
+| :--- | :--- |
+| **🧠 Autonomous Reasoning** | Uses LangGraph ReAct agents to decide between document search, live market data lookups, or historical performance analysis. |
+| **📑 3-Layer PDF Engine** | High-fidelity extraction using `pdfplumber`, `PyMuPDF`, and `Tesseract OCR` fallback for scanned financial reports. |
+| **📉 Mutual Fund Intelligence** | Dedicated tool registry for live NAV quotes, historical performance tracking, and scheme discovery via AMFI. |
+| **⚡ Real-Time Thought Trace** | Transparent research logs showing tool calls and retrieval steps in a collapsible, persistent UI accordion. |
+| **🔗 Deep Source Attribution** | Instant verification with an evidence panel that highlights and previews the exact source chunks used. |
+| **💾 Multi-Session Memory** | Complete conversation and document state persistence across refreshes using IndexedDB and Qdrant. |
 
 ---
 
-### 2. Frontend
+## 📊 System Architecture
 
-*(The Angular Chat Client Framework)*
+### 🔄 Agentic Inference Loop
+Determines the most accurate path to satisfy a financial query.
 
-```cmd
+```mermaid
+graph TD
+    A[User Query] --> B{Agent Router}
+    B -- Needs Docs --> C[Vector Search]
+    B -- Needs Live Data --> D[NAV/Market Tools]
+    B -- Needs History --> E[AMFI Data Tool]
+    C --> F[Context Synthesis]
+    D --> F
+    E --> F
+    F --> G[LLM Response]
+    G --> H[Final UI Update]
+```
+
+### 📥 Optimized Ingestion Pipeline
+Ensures maximum context preservation for complex financial layouts.
+
+```mermaid
+graph LR
+    A[Raw PDF] --> B[3-Layer Extraction]
+    B --> C[pdfplumber: Text]
+    B --> D[PyMuPDF: Layout]
+    B --> E[OCR: Scanned Pages]
+    C & D & E --> F[Contextual Chunking]
+    F --> G[Sentence Transformers]
+    G --> H[(Qdrant Vector DB)]
+```
+
+---
+
+## 🖼️ Gallery
+
+### 🖥️ 2-Pane Dashboard
+The intuitive 2-pane interface separates the primary research chat from the context-aware knowledge sidebar.
+<p align="center">
+  <img src="file:///C:/Users/admin/.gemini/antigravity/brain/a07aabc3-b091-4f05-8a7d-0fca57d3c716/media__1775597536086.png" width="90%" border="1" />
+</p>
+
+### 🧠 Research Steps & 📊 Structured Analysis
+Inspect the agent's real-time thought process or switch to "Explainer Mode" for highly structured tabular summaries.
+<p align="center">
+  <img src="file:///C:/Users/admin/.gemini/antigravity/brain/a07aabc3-b091-4f05-8a7d-0fca57d3c716/media__1775601708848.png" width="48%" />
+  <img src="file:///C:/Users/admin/.gemini/antigravity/brain/a07aabc3-b091-4f05-8a7d-0fca57d3c716/media__1775601729606.png" width="48%" />
+</p>
+
+### 📚 Knowledge Library
+Command center for document management, indexing status, and automated discovery.
+<p align="center">
+  <img src="file:///C:/Users/admin/.gemini/antigravity/brain/a07aabc3-b091-4f05-8a7d-0fca57d3c716/media__1775601741740.png" width="90%" />
+</p>
+
+---
+
+## 🛠️ Tech Stack
+
+### Backend Powerhouse
+- **FastAPI**: High-performance asynchronous API framework.
+- **LangGraph & LangChain**: Orchestration engine for agentic reasoning and tool binding.
+- **Qdrant**: High-performance vector database running in local storage mode.
+- **Sentence Transformers**: Local embedding generation (`all-MiniLM-L6-v2`).
+
+### Frontend Experience
+- **Angular 21**: Industrial-grade framework for a snappy, stateful SPAs.
+- **Tailwind CSS v4**: Modern utility-first styling for a premium aesthetic.
+- **PrimeNG**: Professional-grade UI component library.
+- **IndexedDB**: Persistent local storage for chat history.
+
+---
+
+## 🚀 Getting Started
+
+### 1. Backend Setup
+```bash
+cd backend
+uv sync
+# Create .env with your OpenRouter API Key
+python -m uvicorn app.main:app --reload
+```
+
+### 2. Frontend Setup
+```bash
 cd frontend
 npm install
-ng serve
+npm start
 ```
+
+---
+
+> [!IMPORTANT]
+> **FinSight** is built with a "Privacy First" mindset. All embeddings are generated locally, and your documents are stored in a private local Qdrant instance.

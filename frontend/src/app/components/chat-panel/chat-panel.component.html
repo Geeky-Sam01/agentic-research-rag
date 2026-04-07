@@ -6,106 +6,111 @@
     <!-- Case 1: Empty State (Hero UI) — no header, centered input -->
     @if (chatService.messages().length === 0) {
 
-      <!-- Floating "Get Pro" button (hero only) -->
-      <div class="absolute top-6 right-6 z-50">
-        <button class="pro-button px-5 py-2 rounded-full text-xs font-bold border border-accent/40 text-accent transition-all hover:bg-accent-soft hover:shadow-lg hover:shadow-accent/20 active:scale-95">
-          Get Pro
-        </button>
+    <!-- Floating "Get Pro" button (hero only) -->
+    <div class="absolute top-6 right-6 z-50">
+      <button
+        class="pro-button px-5 py-2 rounded-full text-xs font-bold border border-accent/40 text-accent transition-all hover:bg-accent-soft hover:shadow-lg hover:shadow-accent/20 active:scale-95">
+        Get Pro
+      </button>
+    </div>
+
+    <!-- Hero: title in top-40%, input+chips in bottom-60% -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+
+      <!-- Top 40%: title anchored to bottom -->
+      <div class="flex-[2] flex flex-col items-center justify-end pb-5 px-4">
+        <h2
+          class="text-3xl sm:text-4xl font-bold text-text-primary text-center tracking-tight select-none leading-tight opacity-90">
+          Mutual Fund Research Copilot
+        </h2>
+        <div class="w-20 h-px bg-border-soft mt-4 opacity-40"></div>
       </div>
 
-      <!-- Hero: title in top-40%, input+chips in bottom-60% -->
-      <div class="flex-1 flex flex-col overflow-hidden">
+      <!-- Bottom 60%: input anchored to top, chips + status below -->
+      <div class="flex-[3] flex flex-col items-center justify-start pt-5 px-4 gap-6">
 
-        <!-- Top 40%: title anchored to bottom -->
-        <div class="flex-[2] flex flex-col items-center justify-end pb-5 px-4">
-          <h2 class="text-3xl sm:text-4xl font-bold text-text-primary text-center tracking-tight select-none leading-tight opacity-90">
-            Ask a question about your documents
-          </h2>
-          <div class="w-20 h-px bg-border-soft mt-4 opacity-40"></div>
+        <!-- Input box -->
+        <div class="w-full max-w-2xl">
+          <app-chat-input (send)="onSend($event)" [isCentered]="true" />
         </div>
 
-        <!-- Bottom 60%: input anchored to top, chips + status below -->
-        <div class="flex-[3] flex flex-col items-center justify-start pt-5 px-4 gap-6">
-
-          <!-- Input box -->
-          <div class="w-full max-w-2xl">
-            <app-chat-input (send)="onSend($event)" [isCentered]="true" />
-          </div>
-
-          <!-- Uploaded document chips (only if any exist) -->
-          @if (docService.currentSources().length > 0) {
-            <div class="w-full max-w-2xl flex flex-col items-start gap-2">
-              <p class="text-[10px] text-text-muted uppercase tracking-[0.18em] font-bold opacity-40 select-none">
-                Uploaded Documents
-              </p>
-              <div class="flex flex-wrap gap-2">
-                @for (src of docService.currentSources(); track src) {
-                  <span class="doc-chip inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium bg-panel border border-border text-text-secondary">
-                    <i class="pi pi-file-o text-[10px] text-accent"></i>
-                    {{ src }}
-                  </span>
-                }
-              </div>
-            </div>
-
-            <!-- Suggested Questions (Discovery) -->
-            @if (docService.suggestedQuestions().length > 0) {
-              <div class="w-full max-w-2xl flex flex-col items-start gap-4 mt-2">
-                <div class="flex items-center gap-3 w-full">
-                  <div class="h-px bg-border-soft flex-1 opacity-20"></div>
-                  <p class="text-[9px] text-text-muted uppercase tracking-[0.2em] font-bold opacity-30 select-none whitespace-nowrap">
-                    Suggested Analysis
-                  </p>
-                  <div class="h-px bg-border-soft flex-1 opacity-20"></div>
-                </div>
-                <div class="flex flex-wrap gap-2 justify-start">
-                  @for (q of docService.suggestedQuestions(); track q) {
-                    <button (click)="useSuggestedQuestion(q)"
-                            class="suggested-chip px-3.5 py-1.5 rounded-full border border-border bg-panel text-text-secondary text-[11px] hover:bg-bg-soft hover:border-accent/30 transition-all active:scale-95 shadow-sm">
-                      {{ q }}
-                    </button>
-                  }
-                </div>
-              </div>
+        <!-- Uploaded document chips (only if any exist) -->
+        @if (docService.currentSources().length > 0) {
+        <div class="w-full max-w-2xl flex flex-col items-start gap-2">
+          <p class="text-[10px] text-text-muted uppercase tracking-[0.18em] font-bold opacity-40 select-none">
+            Uploaded Documents
+          </p>
+          <div class="flex flex-wrap gap-2">
+            @for (src of docService.currentSources(); track src) {
+            <span
+              class="doc-chip inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-medium bg-panel border border-border text-text-secondary">
+              <i class="pi pi-file-o text-[10px] text-accent"></i>
+              {{ src }}
+            </span>
             }
-          } @else {
-            <!-- Status line when no docs -->
-            <div class="flex items-center gap-2">
-              <span class="w-1.5 h-1.5 rounded-full bg-text-muted opacity-40"></span>
-              <p class="text-[12px] text-text-muted opacity-50 select-none">
-                No documents uploaded yet — upload from Knowledge Base
-              </p>
-            </div>
-          }
-
+          </div>
         </div>
 
+        <!-- Suggested Questions (Discovery) -->
+        @if (docService.suggestedQuestions().length > 0) {
+        <div class="w-full max-w-2xl flex flex-col items-start gap-4 mt-2">
+          <div class="flex items-center gap-3 w-full">
+            <div class="h-px bg-border-soft flex-1 opacity-20"></div>
+            <p
+              class="text-[9px] text-text-muted uppercase tracking-[0.2em] font-bold opacity-30 select-none whitespace-nowrap">
+              Suggested Analysis
+            </p>
+            <div class="h-px bg-border-soft flex-1 opacity-20"></div>
+          </div>
+          <div class="flex flex-wrap gap-2 justify-start">
+            @for (q of docService.suggestedQuestions(); track q) {
+            <button (click)="useSuggestedQuestion(q)"
+              class="suggested-chip px-3.5 py-1.5 rounded-full border border-border bg-panel text-text-secondary text-[11px] hover:bg-bg-soft hover:border-accent/30 transition-all active:scale-95 shadow-sm">
+              {{ q }}
+            </button>
+            }
+          </div>
+        </div>
+        }
+        } @else {
+        <!-- Status line when no docs -->
+        <div class="flex items-center gap-2">
+          <span class="w-1.5 h-1.5 rounded-full bg-text-muted opacity-40"></span>
+          <p class="text-[12px] text-text-muted opacity-50 select-none">
+            No documents uploaded yet — upload from Knowledge Base
+          </p>
+        </div>
+        }
+
       </div>
+
+    </div>
 
     } @else {
 
-      <!-- Case 2: Chat State — header + messages + bottom input -->
-      <div class="flex-1 flex flex-col min-h-0">
-        <app-chat-header />
-        <app-message-list class="flex-1 h-0 overflow-hidden" />
-        <app-chat-input (send)="onSend($event)" [isCentered]="false" />
-      </div>
+    <!-- Case 2: Chat State — header + messages + bottom input -->
+    <div class="flex-1 flex flex-col min-h-0">
+      <app-chat-header />
+      <app-message-list class="flex-1 h-0 overflow-hidden" />
+      <app-chat-input (send)="onSend($event)" [isCentered]="false" />
+    </div>
 
     }
   </div>
 
   <!-- 🍞 Global Toast -->
   @if (docService.toastMessage()) {
-    <div class="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] animate-toast-in">
-      <div class="flex items-center gap-3 px-6 py-3 rounded-2xl bg-[#1A1A1A] border border-accent/30 shadow-2xl backdrop-blur-md">
-        <div class="w-8 h-8 flex items-center justify-center rounded-full bg-accent text-bg-main">
-          <i class="pi pi-bell text-xs"></i>
-        </div>
-        <p class="text-sm font-medium text-[#EAEAEA] tracking-tight">
-          {{ docService.toastMessage() }}
-        </p>
+  <div class="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] animate-toast-in">
+    <div
+      class="flex items-center gap-3 px-6 py-3 rounded-2xl bg-[#1A1A1A] border border-accent/30 shadow-2xl backdrop-blur-md">
+      <div class="w-8 h-8 flex items-center justify-center rounded-full bg-accent text-bg-main">
+        <i class="pi pi-bell text-xs"></i>
       </div>
+      <p class="text-sm font-medium text-[#EAEAEA] tracking-tight">
+        {{ docService.toastMessage() }}
+      </p>
     </div>
+  </div>
   }
 
 </div>
