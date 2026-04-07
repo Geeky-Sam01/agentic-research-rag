@@ -21,19 +21,16 @@ export class ChatService {
   private readonly BASE_URL = 'http://localhost:8000';
 
   async sendQuery(query: string) {
-    // Retain existing streaming logic as default generic entry point
     return this.streamChat(query);
   }
 
   async streamChat(query: string) {
     this.closeStream();
 
-    // Ensure we have a session
     if (!this.historyService.currentSessionId()) {
       await this.historyService.createNewChat();
     }
 
-    // Push user message
     const userMsg: Message = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -42,7 +39,6 @@ export class ChatService {
     };
     this.messages.update((msgs: Message[]) => [...msgs, userMsg]);
 
-    // Create empty assistant message
     const assistantId = crypto.randomUUID();
     const assistantMsg: Message = {
       id: assistantId,
@@ -54,12 +50,10 @@ export class ChatService {
     this.messages.update((msgs: Message[]) => [...msgs, assistantMsg]);
     this.loading.set(true);
 
-    if (this.docService.currentSources().length > 0) {
-      this.status.set('Searching documents...');
-      this.statusHistory.set(['Searching documents...']);
-    }
+    // Initial status
+    this.status.set('Thinking...');
+    this.statusHistory.set(['Thinking...']);
 
-    // Open SSE stream avec model selection
     const url = `${this.BASE_URL}/api/chat/query-stream?query=${encodeURIComponent(query)}&model=${this.selectedModel()}`;
     this.eventSource = new EventSource(url);
 
@@ -67,7 +61,15 @@ export class ChatService {
       try {
         const data = JSON.parse(event.data);
 
-        // Handle sources metadata (new backend format)
+        // Handle tool calls (thinking markers)
+        if (data.type === 'toolcall') {
+          const statusMsg = this.getToolStatusMessage(data.tool, data.input);
+          this.status.set(statusMsg);
+          this.statusHistory.update(prev => [...prev, statusMsg]);
+          return;
+        }
+
+        // Handle sources metadata
         if (data.type === 'sources' && data.sources) {
           const chunks: Chunk[] = data.sources.map((s: Source, i: number) => ({
             id: `chunk-${i}-${Date.now()}`,
@@ -77,30 +79,19 @@ export class ChatService {
           }));
           this.chunks.set(chunks);
 
-          // Build citation objects and attach to the assistant message
           const citations = data.sources.map((s: Source, i: number) => ({
             id: `cite-${i}-${Date.now()}`,
             chunkId: `chunk-${i}-${Date.now()}`,
             label: s.source
           }));
+          
           this.messages.update((msgs: Message[]) => msgs.map((m: Message) =>
             m.id === assistantId ? { ...m, citations } : m
           ));
           
-          if (this.docService.currentSources().length > 0) {
-            const msg = `Retrieved ${data.sources.length} relevant sections`;
-            this.status.set(msg);
-            this.statusHistory.update((prev: string[]) => [...prev, msg]);
-            
-            // Switch to synthesizing after a small delay for readability
-            setTimeout(() => {
-              if (this.loading()) {
-                const msg2 = 'Synthesizing answer...';
-                this.status.set(msg2);
-                this.statusHistory.update((prev: string[]) => [...prev, msg2]);
-              }
-            }, 1000);
-          }
+          const msg = `Retrieved ${data.sources.length} relevant sections`;
+          this.status.set(msg);
+          this.statusHistory.update((prev: string[]) => [...prev, msg]);
           return;
         }
 
@@ -124,14 +115,12 @@ export class ChatService {
 
         // Append streamed content
         if (data.content) {
-          // Detected error or switch event in the content stream
           if (data.content.includes('⚠️') || data.content.startsWith('ERROR:')) {
              this.docService.showToast(data.content.replace('ERROR:', '').split('\n')[0]);
           }
 
           // Once content starts, clear status
           this.status.set(null);
-          // (keep statusHistory for current message display)
           this.messages.update((msgs: Message[]) => msgs.map((m: Message) =>
             m.id === assistantId
               ? { ...m, content: m.content + data.content }
@@ -153,12 +142,10 @@ export class ChatService {
   async structuredChat(query: string) {
     this.closeStream();
 
-    // Ensure we have a session
     if (!this.historyService.currentSessionId()) {
       await this.historyService.createNewChat();
     }
 
-    // Push user message
     const userMsg: Message = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -171,17 +158,13 @@ export class ChatService {
     const assistantMsg: Message = {
       id: assistantId,
       role: 'assistant',
-      content: '', // No markdown text for structured mode
+      content: '',
       timestamp: new Date(),
       isStreaming: true
     };
     this.messages.update((msgs: Message[]) => [...msgs, assistantMsg]);
     this.loading.set(true);
-
-    if (this.docService.currentSources().length > 0) {
-      this.status.set('Searching parameters & extracting structures...');
-      this.statusHistory.set(['Searching documents...', 'Structuring output...']);
-    }
+    this.status.set('Structuring output...');
 
     const payload = {
       query: query,
@@ -190,7 +173,6 @@ export class ChatService {
 
     this.http.post<any>(`${this.BASE_URL}/api/chat/query-structured`, payload).subscribe({
       next: (data) => {
-        // Handle sources
         if (data.sources) {
           const chunks: Chunk[] = data.sources.map((s: Source, i: number) => ({
              id: `chunk-${i}-${Date.now()}`,
@@ -211,7 +193,6 @@ export class ChatService {
           ));
         }
 
-        // Attach structured payload
         if (data.structuredPayload) {
           this.messages.update((msgs: Message[]) => msgs.map((m: Message) =>
              m.id === assistantId ? { ...m, structuredPayload: data.structuredPayload } : m
@@ -237,8 +218,6 @@ export class ChatService {
     this.messages.update((msgs: Message[]) => msgs.map((m: Message) =>
       m.id === assistantId ? { ...m, isStreaming: false } : m
     ));
-
-    // Persist to history
     this.historyService.updateCurrentSession(this.messages(), this.chunks());
   }
 
@@ -247,6 +226,25 @@ export class ChatService {
       this.eventSource.close();
       this.eventSource = null;
     }
+  }
+
+  private getToolStatusMessage(tool: string, input: any): string {
+    const query = input?.query || input?.scheme_code || input?.amc_name || '';
+    const suffix = query ? ` for "${query}"` : '...';
+
+    const toolMap: Record<string, string> = {
+      'read_factsheet': 'Reading fund documents',
+      'get_scheme_quote': 'Fetching latest NAV',
+      'search_schemes': 'Searching fund house portfolio',
+      'search_scheme_by_name': 'Searching for scheme by keyword',
+      'get_historical_nav': 'Retrieving historical performance',
+      'calculate_returns': 'Calculating investment returns',
+      'get_equity_performance': 'Analyzing equity market performance',
+      'get_debt_performance': 'Analyzing debt market performance',
+      'get_hybrid_performance': 'Analyzing hybrid market performance'
+    };
+
+    return (toolMap[tool] || `Executing ${tool}`) + suffix;
   }
 
   setSelectedChunk(id: string | null): void {

@@ -6,10 +6,11 @@ from app.core.config import settings  # type: ignore
 from app.services.embeddings import get_embeddings, get_cache_stats, model as _embedder  # type: ignore
 from app.services.document_processor import extract_text_from_file, chunk_structured_document  # type: ignore
 from app.models.schemas import DocumentUploadResponse  # type: ignore
-from app.services.injest import (  # type: ignore
-    get_client, ensure_collection, ingest_file, delete_document, 
+from app.services.qdrant_service import (
+    get_client, ensure_collection, delete_document, 
     get_collection_stats, clear_collection
 )
+from app.services.injest import ingest_file
 from sentence_transformers import SentenceTransformer  # type: ignore
 
 logger = logging.getLogger(__name__)

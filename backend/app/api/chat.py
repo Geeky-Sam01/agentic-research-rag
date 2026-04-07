@@ -3,79 +3,59 @@ from fastapi.responses import StreamingResponse, JSONResponse  # type: ignore
 import logging
 import json
 from typing import Optional
-from sentence_transformers import SentenceTransformer  # type: ignore
 
-from app.core.config import settings  # type: ignore
-from app.services.injest import get_client, query_qdrant  # type: ignore
-from app.services.embeddings import model as _embedder  # type: ignore
-from app.services.llm import generate_answer_stream, generate_answer_structured  # type: ignore
-from app.models.schemas import QueryRequest, QueryResponse, Source  # type: ignore
+from app.services.injest import get_client
+from app.services.langchain_agents import run_agent_query, stream_agent_query
+from app.services.llm import generate_answer_structured  # type: ignore
+from app.models.schemas import QueryRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
-
-# ── Shared clients (initialised once at import time) ─────────────────────────
+# ── Shared clients ──────────────────────────────────────────────────────────
 _qdrant_client = get_client()
-# _embedder is now imported from embeddings service
-
 
 @router.get("/query-stream")
 async def query_stream(query: str = Query(...), model: Optional[str] = None):
-    """Stream query response with proper PDR context."""
-
+    """
+    Stream query response using the autonomous research agent.
+    The agent dynamically decides between RAG (Factsheets) and live MF API.
+    """
     if not query or not query.strip():
         raise HTTPException(status_code=400, detail="Query is required")
 
-    logger.info(f"\n Stream Query: \"{query}\"")
+    logger.info(f"🌊 Agentic Stream Query: \"{query}\"")
 
     async def event_generator():
         try:
-            # 🔹 Step 1: SEARCH QDRANT
-            results = query_qdrant(
-                query    = query,
-                client   = _qdrant_client,
-                embedder = _embedder,
-                top_k    = 8
-            )
-
-            if not results:
-                yield f"data: {json.dumps({'content': 'No relevant documents found.'})}\n\n"
-                return
-
-            logger.info(f"📚 Found {len(results)} relevant chunks")
-
-            # 🔹 Step 2: Build context
-            context = "\n\n---\n\n".join([r["text"] for r in results])
-
-            # 🔹 Step 3: Format Sources (Deduplicated for UI tags)
-            sources_payload = []
-            seen_sources = set()
-            for r in results:
-                source_label = f"{r['file']} - p.{r['page']}" if r.get('page') else str(r['file'])
+            async for event in stream_agent_query(query):
+                kind = event["event"]
                 
-                # We still want to show the full list of chunks in the evidence panel if needed,
-                # but for the citations list (sources_payload), deduplication is better.
-                if source_label not in seen_sources:
-                    sources_payload.append({
-                        "text":    r["text"][:200] + ("..." if len(r["text"]) > 200 else ""),
-                        "source":  source_label,
-                        "similarity": f"{r['score']*100:.1f}%"
-                    })
-                    seen_sources.add(source_label)
-
-            # 🔹 Step 5: Emit sources first
-            yield f"data: {json.dumps({'type': 'sources', 'sources': sources_payload})}\n\n"
-            logger.info(f" Emitted deduplicated sources: {len(sources_payload)} items")
-
-            # 🔹 Step 6: Stream answer using CLEAN context and optional model override
-            logger.info(f"⏳ Streaming answer (override={model})...")
-
-            async for chunk in generate_answer_stream(query, context, model_override=model):
-                yield f"data: {json.dumps({'content': chunk})}\n\n"
+                # 1. Text chunks from the model
+                if kind == "on_chat_model_stream":
+                    content = event["data"]["chunk"].content
+                    if content:
+                        yield f"data: {json.dumps({'content': content})}\n\n"
+                
+                # 2. Tool calls (Start of action)
+                elif kind == "on_tool_start":
+                    yield f"data: {json.dumps({
+                        'type': 'toolcall', 
+                        'tool': event['name'], 
+                        'input': event['data'].get('input')
+                    })}\n\n"
+                
+                # 3. Tool outputs (End of action - Intercept 'read_factsheet' to emit sources)
+                elif kind == "on_tool_end":
+                    if event["name"] == "read_factsheet":
+                        output = event["data"]["output"]
+                        if isinstance(output, dict) and "sources" in output:
+                            sources = output["sources"]
+                            yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
+                            logger.info(f"📚 Agent consulted documents: {len(sources)} sources emitted")
 
             yield f"data: {json.dumps({'content': '[DONE]'})}\n\n"
-            logger.info("✅ Streaming complete")
+            logger.info("✅ Agentic stream complete")
 
         except Exception as e:
             logger.error(f"Stream error: {e}")
@@ -85,54 +65,30 @@ async def query_stream(query: str = Query(...), model: Optional[str] = None):
 
 @router.post("/query-structured")
 async def query_structured(request: QueryRequest):
-    """Wait for and return a structured JSON response."""
-    
+    """
+    Wait for and return a structured JSON response via the research agent.
+    """
     if not request.query or not request.query.strip():
         raise HTTPException(status_code=400, detail="Query is required")
         
-    logger.info(f"\n Structured Query: \"{request.query}\"")
+    logger.info(f"🤖 Agentic Structured Query: \"{request.query}\"")
     
     try:
-        # Step 1: SEARCH QDRANT
-        results = query_qdrant(
-            query    = request.query,
-            client   = _qdrant_client,
-            embedder = _embedder,
-            top_k    = 8
-        )
+        # Step 1: Run the autonomous agent to get the ground truth / analysis
+        agent_res = await run_agent_query(request.query)
         
-        sources_payload = []
-        if results:
-            # Build context
-            context = "\n\n---\n\n".join([r["text"] for r in results])
-            
-            # Format Sources (Deduplicated for UI tags)
-            seen_sources = set()
-            for r in results:
-                source_label = f"{r['file']} - p.{r['page']}" if r.get('page') else str(r['file'])
-                if source_label not in seen_sources:
-                    sources_payload.append({
-                        "text":    r["text"][:200] + ("..." if len(r["text"]) > 200 else ""),
-                        "source":  source_label,
-                        "similarity": f"{r['score']*100:.1f}%"
-                    })
-                    seen_sources.add(source_label)
-        else:
-            context = "No relevant context found."
-
-        # Step 2: Generate Answer
-        logger.info(f"⏳ Generating structured answer (override=openrouter/free)...")
+        # Step 2: Use the structured parser to transform raw analysis into UI-friendly blocks
+        # We pass the agent's output as 'context' to the formatting chain
         structured_data = await generate_answer_structured(
             request.query, 
-            context,
+            context=agent_res["output"],
             model_override="openrouter/free"
         )
         
-        # We return the structured payload, plus the sources that the frontend expects
         return JSONResponse(content={
             "query": request.query,
             "structuredPayload": structured_data,
-            "sources": sources_payload
+            "sources": agent_res["sources"]
         })
         
     except Exception as e:

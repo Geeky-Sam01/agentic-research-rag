@@ -229,7 +229,7 @@ textarea.p-textarea:focus,
 }
 
 .msg-assistant {
-  max-width: 720px;
+  max-width: none;
   width: 100%;
   line-height: 1.7;
   color: var(--color-text-primary);
