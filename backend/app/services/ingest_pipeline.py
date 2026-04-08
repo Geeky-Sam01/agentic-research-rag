@@ -41,7 +41,7 @@ def ingest_file(
     # ── 1. Extract structured document ───────────────────────────────
     document = extract_text_from_file(file_path)
     if not document:
-        print(f"No content extracted from {path.name}")
+        logger.warning(f"No content extracted from {path.name}")
         return 0, []
 
     # ── 2. Build doc-level metadata (passed in from caller) ───────────
@@ -56,10 +56,10 @@ def ingest_file(
     # ── 3. Chunk — metadata gets merged into every chunk here ─────────
     chunks = chunk_structured_document(document, doc_metadata=doc_metadata)
     if not chunks:
-        print(f"No chunks produced from {path.name}")
+        logger.warning(f"No chunks produced from {path.name}")
         return 0, document
 
-    print(f"{path.name}  ->  {len(chunks)} chunks")
+    logger.info(f"{path.name}  ->  {len(chunks)} chunks")
 
     # ── 4. Embed ──────────────────────────────────────────────────────
     texts  = [c["text"] for c in chunks]
@@ -85,7 +85,7 @@ def ingest_file(
             points=points[i : i + batch_size],  # type: ignore
         )
 
-    print(f"Upserted {len(points)} points for {path.name}")
+    logger.info(f"Upserted {len(points)} points for {path.name}")
     return len(points), document
 
 

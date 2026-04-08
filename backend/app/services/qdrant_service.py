@@ -41,9 +41,9 @@ def ensure_collection(client: QdrantClient) -> None:
             collection_name=COLLECTION_NAME,
             vectors_config=VectorParams(size=settings.EMBEDDING_DIM, distance=Distance.COSINE),
         )
-        print(f"Created collection: {COLLECTION_NAME}")
+        logger.info(f"Created collection: {COLLECTION_NAME}")
     else:
-        print(f"Collection already exists: {COLLECTION_NAME}")
+        logger.info(f"Collection already exists: {COLLECTION_NAME}")
 
 
 # ------------------------------------------------------------------ #
@@ -120,7 +120,7 @@ def delete_document(file_name: str, client: QdrantClient) -> None:
             must=[FieldCondition(key="source_file", match=MatchValue(value=file_name))]
         ),
     )
-    print(f"Deleted all points for {file_name}")
+    logger.info(f"Deleted all points for {file_name}")
 
 
 def clear_collection(client: QdrantClient) -> bool:
@@ -175,5 +175,5 @@ def get_collection_stats(client: QdrantClient) -> Dict[str, Any]:
             "status":  str(info.status),
         }
     except Exception as e:
-        print(f"Failed to get stats: {e}")
+        logger.error(f"Failed to get stats: {e}")
         return {"vectors": 0, "sources": [], "status": "error"}

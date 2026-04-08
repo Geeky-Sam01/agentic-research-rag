@@ -30,8 +30,8 @@ class Settings(BaseSettings):
     LLM_MODEL: str
     
     # Qdrant
-    QUDRANT_API_KEY: str | None = None
-    QUDRANT_END_POINT: str | None = None
+    QDRANT_API_KEY: str | None = None
+    QDRANT_END_POINT: str | None = None
 
 settings = Settings()
 
