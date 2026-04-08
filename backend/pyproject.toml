@@ -38,7 +38,7 @@ dependencies = [
     "networkx==3.6.1",
     "numpy==1.26.4",
     "packaging==26.0",
-    "pdfplumber==0.11.4",
+    "pdfplumber>=0.11.4",
     "pillow==12.2.0",
     "propcache==0.4.1",
     "pydantic==2.12.5",

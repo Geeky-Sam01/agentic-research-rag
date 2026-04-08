@@ -47,7 +47,7 @@ jobs:
       - name: Dependency Audit (pip-audit)
         run: |
           cd backend
-          uv run pip-audit -r pyproject.toml
+          uv run pip-audit
 
   frontend:
     name: Frontend CI

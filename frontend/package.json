@@ -40,6 +40,7 @@
         "vitest": "^4.0.8"
     },
     "overrides": {
-        "lodash-es": "^4.17.21"
+        "lodash-es": "^4.17.21",
+        "vite": "^7.3.2"
     }
 }
