@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+.env
+.venv
+tests
+.pytest_cache
+qdrant_db
+uploads
+indices
+models
+*.egg-info

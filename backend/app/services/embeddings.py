@@ -5,8 +5,8 @@ from app.core.config import settings  # pyre-ignore[21]
 from sentence_transformers import SentenceTransformer  # pyre-ignore[21]
 logger = logging.getLogger(__name__)
 
-# Load embedding model once. We use a local cache folder to avoid repeated downloads or HF Hub checks.
-model = SentenceTransformer(settings.EMBEDDING_MODEL, cache_folder="./models")
+# Load embedding model once.
+model = SentenceTransformer(settings.EMBEDDING_MODEL)
 
 # In-memory cache for embeddings
 embedding_cache = {}
