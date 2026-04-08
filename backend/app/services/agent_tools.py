@@ -1,8 +1,10 @@
 import logging
+
 from langchain_core.tools import tool
+
+from app.services.embeddings import model as _embedder
 from app.services.mf_instance import mf
 from app.services.qdrant_service import get_client
-from app.services.embeddings import model as _embedder
 from app.services.rag_pipeline import get_rag_context
 
 logger = logging.getLogger(__name__)

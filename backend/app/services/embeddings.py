@@ -1,8 +1,11 @@
 import asyncio
-from typing import List
 import logging
-from app.core.config import settings  # pyre-ignore[21]
+from typing import List
+
 from sentence_transformers import SentenceTransformer  # pyre-ignore[21]
+
+from app.core.config import settings  # pyre-ignore[21]
+
 logger = logging.getLogger(__name__)
 
 # Load embedding model once.

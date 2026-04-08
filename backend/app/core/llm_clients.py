@@ -1,5 +1,7 @@
 from langchain_openai import ChatOpenAI
+
 from app.core.config import settings
+
 
 def make_llm(model: str, streaming: bool = False) -> ChatOpenAI:
     return ChatOpenAI(

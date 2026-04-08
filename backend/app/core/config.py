@@ -1,6 +1,7 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict  # pyre-ignore[21]
 from pathlib import Path
-import os
+
+from pydantic_settings import BaseSettings, SettingsConfigDict  # pyre-ignore[21]
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(

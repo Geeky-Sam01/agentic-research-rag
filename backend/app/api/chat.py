@@ -1,13 +1,13 @@
-from fastapi import APIRouter, HTTPException, Query  # type: ignore
-from fastapi.responses import StreamingResponse, JSONResponse  # type: ignore
-import logging
 import json
-from typing import Optional
+import logging
 
+from fastapi import APIRouter, HTTPException, Query  # type: ignore
+from fastapi.responses import JSONResponse, StreamingResponse  # type: ignore
+
+from app.models.schemas import QueryRequest
 from app.services.ingest_pipeline import get_client
 from app.services.langchain_agents import run_agent_query, stream_agent_query
 from app.services.llm import generate_answer_structured  # type: ignore
-from app.models.schemas import QueryRequest
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["chat"])

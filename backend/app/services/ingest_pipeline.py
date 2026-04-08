@@ -1,21 +1,19 @@
-import uuid
 import argparse
 import logging
+import uuid
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct
 
+from app.services.document_processor import chunk_structured_document, extract_text_from_file
 from app.services.embeddings import model as _embedder
-from app.services.document_processor import extract_text_from_file, chunk_structured_document
 from app.services.qdrant_service import (
-    get_client, 
-    ensure_collection, 
-    delete_document, 
-    clear_collection, 
-    get_collection_stats,
-    COLLECTION_NAME
+    COLLECTION_NAME,
+    delete_document,
+    ensure_collection,
+    get_client,
 )
 
 logger = logging.getLogger(__name__)

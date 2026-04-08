@@ -1,16 +1,15 @@
 import logging
-from typing import AsyncGenerator, Optional, List
+from typing import AsyncGenerator, Optional
 
-
-from langchain_core.output_parsers import StrOutputParser
 from app.core.config import settings
 from app.core.llm_clients import get_llm_with_fallbacks
+from app.models.schemas import FinSightResponse
 from app.services.prompts import RAG_STREAM_PROMPT, RAG_STRUCTURED_PROMPT
 
 logger = logging.getLogger(__name__)
 
 
-from app.models.schemas import FinSightResponse
+
 
 # ── 2. Streaming (Unchanged) ──────────────────────────────────────────────
 async def generate_answer_stream(

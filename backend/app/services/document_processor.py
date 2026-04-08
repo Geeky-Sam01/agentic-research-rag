@@ -1,11 +1,11 @@
+import io
 import logging
 import re
-import io
-from typing import List, Dict, Any, Optional
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-import pdfplumber
 import fitz  # PyMuPDF
+import pdfplumber
 import pytesseract
 from PIL import Image
 
@@ -34,7 +34,7 @@ def _extract_txt(file_path: str) -> List[Dict[str, Any]]:
     try:
         with open(file_path, "r", encoding="utf-8") as f:
             text = f.read()
-    except:
+    except Exception:
         with open(file_path, "r", encoding="latin-1") as f:
             text = f.read()
 
@@ -61,7 +61,7 @@ def _extract_pdf(file_path: str) -> List[Dict[str, Any]]:
                         pix = doc[i].get_pixmap(dpi=300)
                         img = Image.open(io.BytesIO(pix.tobytes("png")))
                         text = pytesseract.image_to_string(img).strip()
-                    except:
+                    except Exception:
                         pass
 
                 sections = []
@@ -69,7 +69,7 @@ def _extract_pdf(file_path: str) -> List[Dict[str, Any]]:
                 # 1. TABLE EXTRACTION
                 try:
                     tables = p0.extract_tables()
-                except:
+                except Exception:
                     tables = []
 
                 for tbl in tables:

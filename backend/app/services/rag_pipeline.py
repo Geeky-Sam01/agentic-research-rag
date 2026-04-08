@@ -1,6 +1,6 @@
 import logging
-import json
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict
+
 from qdrant_client import QdrantClient
 
 from app.services.qdrant_service import query_qdrant

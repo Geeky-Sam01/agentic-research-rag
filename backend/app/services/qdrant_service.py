@@ -1,11 +1,15 @@
 import logging
-import uuid
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
-    Distance, VectorParams,
-    PointStruct, Filter, FieldCondition, MatchValue,
+    Distance,
+    FieldCondition,
+    Filter,
+    MatchValue,
+    VectorParams,
 )
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)

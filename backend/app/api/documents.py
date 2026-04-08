@@ -1,17 +1,20 @@
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException  # type: ignore
 import logging
 from pathlib import Path
 
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile  # type: ignore
+
 from app.core.config import settings  # type: ignore
-from app.services.embeddings import get_embeddings, get_cache_stats, model as _embedder  # type: ignore
-from app.services.document_processor import extract_text_from_file, chunk_structured_document  # type: ignore
 from app.models.schemas import DocumentUploadResponse  # type: ignore
-from app.services.qdrant_service import (
-    get_client, ensure_collection, delete_document, 
-    get_collection_stats, clear_collection
-)
+from app.services.embeddings import get_cache_stats  # type: ignore
+from app.services.embeddings import model as _embedder
 from app.services.ingest_pipeline import ingest_file
-from sentence_transformers import SentenceTransformer  # type: ignore
+from app.services.qdrant_service import (
+    clear_collection,
+    delete_document,
+    ensure_collection,
+    get_client,
+    get_collection_stats,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/documents", tags=["documents"])
