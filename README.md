@@ -1,10 +1,14 @@
+<div align="center">
+
 # 🔍 FinSight: Agentic Financial Research RAG
 
+[![CI Status](https://github.com/Geeky-Sam01/agentic-research-rag/actions/workflows/ci.yml/badge.svg)](https://github.com/Geeky-Sam01/agentic-research-rag/actions/workflows/ci.yml)
 [![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Angular](https://img.shields.io/badge/Frontend-Angular%2021-DD0031?style=flat-square&logo=angular&logoColor=white)](https://angular.io/)
 [![LangChain](https://img.shields.io/badge/Agent-LangGraph-00ADFF?style=flat-square&logo=langchain&logoColor=white)](https://langchain.com/)
 [![VectorDB](https://img.shields.io/badge/VectorDB-Qdrant-FF4B4B?style=flat-square&logo=qdrant&logoColor=white)](https://qdrant.tech/)
-[![CI](https://github.com/Geeky-Sam01/agentic-research-rag/actions/workflows/ci.yml/badge.svg)](https://github.com/Geeky-Sam01/agentic-research-rag/actions/workflows/ci.yml)
+
+</div>
 
 **FinSight** is an autonomous financial research assistant that combines deep document analysis with live market data retrieval. Built on an agentic RAG pipeline, it doesn't just find information—it researches, verifies, and synthesizes analytical answers.
 

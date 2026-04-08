@@ -29,6 +29,11 @@ jobs:
           cd backend
           uv sync --frozen
 
+      - name: Static Analysis (Bandit)
+        run: |
+          cd backend
+          uv run bandit -r app/ -ll
+
       - name: Run Lint (Ruff)
         run: |
           cd backend
@@ -38,6 +43,11 @@ jobs:
         run: |
           cd backend
           uv run pytest tests/ -v --tb=short
+
+      - name: Dependency Audit (pip-audit)
+        run: |
+          cd backend
+          uv run pip-audit -r pyproject.toml
 
   frontend:
     name: Frontend CI
@@ -61,3 +71,20 @@ jobs:
         run: |
           cd frontend
           npm run build
+
+      - name: Security Check (npm audit)
+        run: |
+          cd frontend
+          npm audit --audit-level=high
+
+  docker:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Backend Image
+        run: docker build ./backend
+
+      - name: Build Frontend Image
+        run: docker build ./frontend
