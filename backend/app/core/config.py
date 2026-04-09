@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     
     # Server Config
     PORT: int = 8000
-    HOST: str = "0.0.0.0"
+    HOST: str = "0.0.0.0"  # nosec B104
     DEBUG: bool = False
     
     # CORS

@@ -61,8 +61,8 @@ def _extract_pdf(file_path: str) -> List[Dict[str, Any]]:
                         pix = doc[i].get_pixmap(dpi=300)
                         img = Image.open(io.BytesIO(pix.tobytes("png")))
                         text = pytesseract.image_to_string(img).strip()
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.warning(f"OCR fallback failed for page {i+1}: {str(e)}")
 
                 sections = []
 
