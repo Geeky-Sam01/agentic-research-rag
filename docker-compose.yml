@@ -9,13 +9,22 @@ services:
       - qdrant_data:/app/qdrant_db # Persist Qdrant data
       - ./backend/uploads:/app/uploads # Persist uploaded files
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -f http://localhost:8000/docs || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   frontend:
     build: ./frontend
     ports:
       - "4200:80"
+    environment:
+      - BACKEND_URL=http://backend:8000
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

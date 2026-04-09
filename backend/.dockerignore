@@ -7,5 +7,6 @@ tests
 qdrant_db
 uploads
 indices
-models
+models/*
+!models/onnx
 *.egg-info

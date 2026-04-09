@@ -14,9 +14,9 @@ class Settings(BaseSettings):
     OPENROUTER_API_KEY: str
     
     # Server Config
-    PORT: int
-    HOST: str
-    DEBUG: bool
+    PORT: int = 8000
+    HOST: str = "0.0.0.0"
+    DEBUG: bool = False
     
     # CORS
     CORS_ORIGIN: str

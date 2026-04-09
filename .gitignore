@@ -21,7 +21,8 @@ Thumbs.db
 # Vector DB / Local Files
 indices/
 uploads/
-backend/models/
+backend/models/*
+!backend/models/onnx/
 backend/qdrant_db/
 *.index
 metadata.json

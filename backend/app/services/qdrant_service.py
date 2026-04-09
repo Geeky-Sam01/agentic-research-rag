@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Any, Dict, List, Optional
 
 from qdrant_client import QdrantClient
@@ -26,20 +27,33 @@ COLLECTION_NAME = "financial_docs"
 
 _client_instance: Optional[QdrantClient] = None
 
+
 def get_client() -> QdrantClient:
     """Initializes and returns a singleton Qdrant client."""
     global _client_instance
     if _client_instance is not None:
         return _client_instance
-        
-    logger.info("Initializing SINGLETON Qdrant client (local mode)")
-    _client_instance = QdrantClient(path="qdrant_db")
+
+    # Option 1: Qdrant Cloud (preferred for prod if set)
+    if settings.QDRANT_API_KEY and settings.QDRANT_END_POINT:
+        logger.info(f"Initializing Qdrant Cloud client (endpoint: {settings.QDRANT_END_POINT})")
+        _client_instance = QdrantClient(
+            url=settings.QDRANT_END_POINT,
+            api_key=settings.QDRANT_API_KEY,
+        )
+    # Option 2: Local persistent storage (standard for Railway Volume)
+    else:
+        # Default path is qdrant_db (matches Railway Volume mount point suggestion)
+        qdrant_path = os.environ.get("QDRANT_PATH", "qdrant_db")
+        logger.info(f"Initializing persistent local Qdrant client at: {qdrant_path}")
+        _client_instance = QdrantClient(path=qdrant_path)
+
     return _client_instance
 
 
 def ensure_collection(client: QdrantClient) -> None:
     existing = [c.name for c in client.get_collections().collections]
-    
+
     if COLLECTION_NAME not in existing:
         client.create_collection(
             collection_name=COLLECTION_NAME,
@@ -54,14 +68,15 @@ def ensure_collection(client: QdrantClient) -> None:
 #  RETRIEVAL
 # ------------------------------------------------------------------ #
 
+
 def query_qdrant(
-    query:     str,
-    client:    QdrantClient,
-    embedder:  Any,
-    fund_name: Optional[str]  = None,
-    doc_type:  Optional[str]  = None,
-    period:    Optional[str]  = None,
-    top_k:     int  = 8,
+    query: str,
+    client: QdrantClient,
+    embedder: Any,
+    fund_name: Optional[str] = None,
+    doc_type: Optional[str] = None,
+    period: Optional[str] = None,
+    top_k: int = 8,
 ) -> List[Dict[str, Any]]:
     """
     Vector search with optional metadata filters.
@@ -74,9 +89,9 @@ def query_qdrant(
     if fund_name:
         must_conditions.append(FieldCondition(key="fund_name", match=MatchValue(value=fund_name)))
     if doc_type:
-        must_conditions.append(FieldCondition(key="doc_type",  match=MatchValue(value=doc_type)))
+        must_conditions.append(FieldCondition(key="doc_type", match=MatchValue(value=doc_type)))
     if period:
-        must_conditions.append(FieldCondition(key="period",    match=MatchValue(value=period)))
+        must_conditions.append(FieldCondition(key="period", match=MatchValue(value=period)))
 
     search_filter = Filter(must=must_conditions) if must_conditions else None
 
@@ -99,14 +114,14 @@ def query_qdrant(
 
     return [
         {
-            "score":   r.score,
-            "text":    r.payload.get("text", ""),
-            "page":    r.payload.get("page"),
+            "score": r.score,
+            "text": r.payload.get("text", ""),
+            "page": r.payload.get("page"),
             "heading": r.payload.get("heading"),
-            "is_table":r.payload.get("is_table"),
-            "fund":    r.payload.get("fund_name"),
-            "period":  r.payload.get("period"),
-            "file":    r.payload.get("source_file"),
+            "is_table": r.payload.get("is_table"),
+            "fund": r.payload.get("fund_name"),
+            "period": r.payload.get("period"),
+            "file": r.payload.get("source_file"),
         }
         for r in results
     ]
@@ -116,13 +131,12 @@ def query_qdrant(
 #  MANAGEMENT ( Stats, Clear, Delete )
 # ------------------------------------------------------------------ #
 
+
 def delete_document(file_name: str, client: QdrantClient) -> None:
     """Deletes all points for a given source_file before re-ingesting."""
     client.delete(
         collection_name=COLLECTION_NAME,
-        points_selector=Filter(
-            must=[FieldCondition(key="source_file", match=MatchValue(value=file_name))]
-        ),
+        points_selector=Filter(must=[FieldCondition(key="source_file", match=MatchValue(value=file_name))]),
     )
     logger.info(f"Deleted all points for {file_name}")
 
@@ -131,17 +145,18 @@ def clear_collection(client: QdrantClient) -> bool:
     """Definitively wipes the entire collection from Qdrant."""
     try:
         logger.info(f"REQUESTED FULL CLEAR for collection: {COLLECTION_NAME}")
-        
+
         try:
             client.delete_collection(collection_name=COLLECTION_NAME)
             logger.info(f"Dropped collection: {COLLECTION_NAME}")
         except Exception as e:
             logger.warning(f"Could not drop collection '{COLLECTION_NAME}': {e}. Trying scroll-delete.")
-            
+
         import time
+
         time.sleep(0.5)
         ensure_collection(client)
-            
+
         logger.info(f"Successfully cleared {COLLECTION_NAME}")
         return True
     except Exception as e:
@@ -153,22 +168,19 @@ def get_collection_stats(client: QdrantClient) -> Dict[str, Any]:
     """Retrieves basic stats and unique source files from Qdrant."""
     try:
         info = client.get_collection(collection_name=COLLECTION_NAME)
-        count = info.points_count if hasattr(info, 'points_count') else 0
-        
+        count = info.points_count if hasattr(info, "points_count") else 0
+
         sources = set()
         scroll_results, _ = client.scroll(
-            collection_name=COLLECTION_NAME,
-            limit=1000,
-            with_payload=True,
-            with_vectors=False
+            collection_name=COLLECTION_NAME, limit=1000, with_payload=True, with_vectors=False
         )
         for point in scroll_results:
             if point.payload:
                 fname = (
-                    point.payload.get("source_file") or 
-                    point.payload.get("file") or 
-                    point.payload.get("source") or
-                    point.payload.get("filename")
+                    point.payload.get("source_file")
+                    or point.payload.get("file")
+                    or point.payload.get("source")
+                    or point.payload.get("filename")
                 )
                 if fname:
                     sources.add(fname)
@@ -176,7 +188,7 @@ def get_collection_stats(client: QdrantClient) -> Dict[str, Any]:
         return {
             "vectors": count,
             "sources": sorted(list(sources)),
-            "status":  str(info.status),
+            "status": str(info.status),
         }
     except Exception as e:
         logger.error(f"Failed to get stats: {e}")
