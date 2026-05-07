@@ -57,7 +57,13 @@ export class ChatService {
     this.statusHistory.set([initialStatus]);
     this.updateMessageStatus(assistantId, initialStatus);
 
-    const url = `${this.BASE_URL}/api/chat/query-stream?query=${encodeURIComponent(query)}`;
+    // Build history: all settled messages before the current user turn
+    const settled = this.messages().slice(0, -1)  // exclude the new user msg just added
+      .filter((m: Message) => m.content && !m.isStreaming)
+      .map((m: Message) => ({ role: m.role, content: m.content }));
+    const historyParam = encodeURIComponent(JSON.stringify(settled));
+
+    const url = `${this.BASE_URL}/api/chat/query-stream?query=${encodeURIComponent(query)}&history=${historyParam}`;
     this.eventSource = new EventSource(url);
 
     this.eventSource.onmessage = (event) => {

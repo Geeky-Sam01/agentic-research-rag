@@ -60,6 +60,8 @@ dependencies = [
     "urllib3==2.6.3",
     "uvicorn==0.43.0",
     "yarl==1.23.0",
+    "cachetools",
+    "langfuse>=4.5.1",
 ]
 
 [dependency-groups]

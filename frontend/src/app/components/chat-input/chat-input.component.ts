@@ -42,11 +42,9 @@ export class ChatInputComponent {
 
   models = [
     { label: 'Auto (Free)', value: 'openrouter/free' },
-    { label: 'StepFun Flash', value: 'stepfun/step-3.5-flash:free' },
+    { label: 'Google Veo 3.1 Fast', value: 'google/veo-3.1-fast' },
     { label: 'Qwen 3.6 Plus', value: 'qwen/qwen3.6-plus:free' },
-    { label: 'Nemotron-3 120B', value: 'nvidia/nemotron-3-super-120b-a12b:free' },
-    { label: 'MiniMax M2.5', value: 'minimax/minimax-m2.5:free' },
-    { label: 'Gemma 2 9B', value: 'google/gemma-2-9b-it:free' }
+    { label: 'Nemotron-3 120B', value: 'nvidia/nemotron-3-super-120b-a12b:free' }
   ];
 
   canSend(): boolean {

@@ -8,6 +8,7 @@ from qdrant_client.models import (
     FieldCondition,
     Filter,
     MatchValue,
+    PointIdsList,
     VectorParams,
 )
 
@@ -142,23 +143,63 @@ def delete_document(file_name: str, client: QdrantClient) -> None:
 
 
 def clear_collection(client: QdrantClient) -> bool:
-    """Definitively wipes the entire collection from Qdrant."""
+    """Wipe all points from the collection.
+
+    Strategy:
+      1. Try drop + recreate (works for local / admin-scoped keys).
+      2. If that fails (scoped Cloud API key), fall back to scroll-all
+         point IDs and batch-delete them (only requires rw access).
+    """
+    import time
+
     try:
         logger.info(f"REQUESTED FULL CLEAR for collection: {COLLECTION_NAME}")
 
+        # ── Attempt 1: drop + recreate (fastest, needs admin rights) ──
         try:
             client.delete_collection(collection_name=COLLECTION_NAME)
             logger.info(f"Dropped collection: {COLLECTION_NAME}")
-        except Exception as e:
-            logger.warning(f"Could not drop collection '{COLLECTION_NAME}': {e}. Trying scroll-delete.")
+            time.sleep(0.5)
+            ensure_collection(client)
+            logger.info(f"Successfully cleared and recreated {COLLECTION_NAME}")
+            return True
+        except Exception as drop_err:
+            logger.warning(
+                f"drop_collection failed (likely scoped API key): {drop_err}. "
+                "Falling back to scroll-delete."
+            )
 
-        import time
+        # ── Attempt 2: scroll all IDs and delete in batches ──────────
+        deleted_total = 0
+        offset = None
 
-        time.sleep(0.5)
-        ensure_collection(client)
+        while True:
+            scroll_result = client.scroll(
+                collection_name=COLLECTION_NAME,
+                limit=500,
+                offset=offset,
+                with_payload=False,
+                with_vectors=False,
+            )
+            points, next_offset = scroll_result
+            if not points:
+                break
 
-        logger.info(f"Successfully cleared {COLLECTION_NAME}")
+            ids = [p.id for p in points]
+            client.delete(
+                collection_name=COLLECTION_NAME,
+                points_selector=PointIdsList(points=ids),
+            )
+            deleted_total += len(ids)
+            logger.info(f"Deleted batch of {len(ids)} points ({deleted_total} total)")
+
+            if next_offset is None:
+                break
+            offset = next_offset
+
+        logger.info(f"Scroll-delete finished — removed {deleted_total} points from {COLLECTION_NAME}")
         return True
+
     except Exception as e:
         logger.error(f"DEEP CLEAR FAILED: {e}")
         return False

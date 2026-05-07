@@ -3,6 +3,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query  # type: ignore
 from fastapi.responses import JSONResponse, StreamingResponse  # type: ignore
+from langchain_core.messages import AIMessage, HumanMessage
 
 from app.models.schemas import QueryRequest
 from app.services.ingest_pipeline import get_client
@@ -16,43 +17,67 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 _qdrant_client = get_client()
 
 @router.get("/query-stream")
-async def query_stream(query: str = Query(...)):
+async def query_stream(query: str = Query(...), history: str = Query(default="[]")):
     """
-    Stream query response using the autonomous research agent.
-    The agent dynamically decides between RAG (Factsheets) and live MF API.
+    Stream query response. Pass prior conversation as JSON in 'history' param:
+    [{"role": "user", "content": "..."},  {"role": "assistant", "content": "..."}]
     """
     if not query or not query.strip():
         raise HTTPException(status_code=400, detail="Query is required")
 
-    logger.info(f"Agentic Stream Query: \"{query}\"")
+    # Parse chat history from JSON query param
+    chat_history = []
+    try:
+        raw_history = json.loads(history)
+        for msg in raw_history[-10:]:  # Last 10 messages max
+            role = msg.get("role", "")
+            content = msg.get("content", "").strip()
+            if not content:
+                continue
+            if role == "user":
+                chat_history.append(HumanMessage(content=content))
+            elif role == "assistant":
+                chat_history.append(AIMessage(content=content))
+    except (json.JSONDecodeError, TypeError, AttributeError):
+        chat_history = []  # Ignore malformed history
+
+    logger.info(f"Agentic Stream Query: \"{query}\" (history: {len(chat_history)} msgs)")
 
     async def event_generator():
         try:
-            async for event in stream_agent_query(query):
-                kind = event["event"]
-                
-                # 1. Text chunks from the model
-                if kind == "on_chat_model_stream":
-                    content = event["data"]["chunk"].content
+            accumulated_sources = []
+            async for event in stream_agent_query(query, chat_history=chat_history or None):
+                event_type = event.get("type")
+
+                # 1. Text chunks
+                if event_type == "token":
+                    content = event.get("content", "")
                     if content:
                         yield f"data: {json.dumps({'content': content})}\n\n"
-                
-                # 2. Tool calls (Start of action)
-                elif kind == "on_tool_start":
-                    yield f"data: {json.dumps({
-                        'type': 'toolcall', 
-                        'tool': event['name'], 
-                        'input': event['data'].get('input')
-                    })}\n\n"
-                
-                # 3. Tool outputs (End of action - Intercept 'read_factsheet' to emit sources)
-                elif kind == "on_tool_end":
-                    if event["name"] == "read_factsheet":
-                        output = event["data"]["output"]
-                        if isinstance(output, dict) and "sources" in output:
-                            sources = output["sources"]
-                            yield f"data: {json.dumps({'type': 'sources', 'sources': sources})}\n\n"
-                            logger.info(f"Agent consulted documents: {len(sources)} sources emitted")
+
+                # 2. Tool calls
+                elif event_type == "tool_start":
+                    yield f"data: {json.dumps({'type': 'toolcall', 'tool': event.get('tool')})}\n\n"
+
+                # 3. Agent routing/status updates
+                elif event_type == "node_start":
+                    yield f"data: {json.dumps({'type': 'status', 'status': event.get('display', 'Thinking...')})}\n\n"
+
+                # 4. Collect sources (don't close stream yet)
+                elif event_type == "done":
+                    sources = event.get("sources", [])
+                    if sources:
+                        accumulated_sources.extend(sources)
+
+                # 5. Errors
+                elif event_type == "error":
+                    error_msg = event.get("message", "Unknown error")
+                    yield f"data: {json.dumps({'error': error_msg})}\n\n"
+
+            # Emit sources and [DONE] AFTER the generator is fully exhausted
+            if accumulated_sources:
+                yield f"data: {json.dumps({'type': 'sources', 'sources': accumulated_sources})}\n\n"
+                logger.info(f"Agent consulted documents: {len(accumulated_sources)} sources emitted")
 
             yield f"data: {json.dumps({'content': '[DONE]'})}\n\n"
             logger.info("Agentic stream complete")

@@ -1,6 +1,6 @@
 <header class="flex items-center justify-between px-6 py-3 bg-panel flex-shrink-0">
 
-  <!-- Left: mobile panel trigger + Brand -->
+  <!-- Left: mobile panel trigger + session title -->
   <div class="flex items-center gap-4">
     <!-- Sources button (mobile only) -->
     <button
@@ -10,22 +10,9 @@
       Sources
     </button>
 
-    <!-- Model Status / Name -->
-    <div class="flex flex-col ml-1 lg:ml-0">
-      <h1 class="text-[14px] font-semibold text-text-primary leading-none">
-        Auto (Free)
-      </h1>
-      <div class="text-[10px] text-text-muted mt-1.5 font-medium uppercase tracking-wider">
-        @if (chatService.loading()) {
-          <span class="flex items-center gap-1.5 min-w-0">
-            <span class="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-accent animate-pulse"></span>
-            <span class="truncate">{{ chatService.status() || 'Thinking…' }}</span>
-          </span>
-        } @else {
-          Model Selected
-        }
-      </div>
-    </div>
+    <h1 class="text-[15px] font-semibold text-text-primary truncate max-w-xs lg:max-w-sm">
+      {{ currentTitle() }}
+    </h1>
   </div>
 
   <!-- Right: actions -->
