@@ -45,6 +45,7 @@ from app.services.prompts import (
     QUERY_REWRITER_PROMPT,
     SYNTHESIZER_PROMPT,
 )
+from app.services.router import route_message, stream_no_tool_response
 
 try:
     from langfuse.callback import CallbackHandler as LangfuseHandler
@@ -93,44 +94,7 @@ class PipelineState(TypedDict):
 # 3. SINGLETON LLMs
 # ══════════════════════════════════════════════════════════════════════════════
 
-_llm_instance: Optional[ChatOpenAI] = None
-_planner_llm_instance: Optional[ChatOpenAI] = None
-
-
-def get_llm() -> ChatOpenAI:
-    """Main LLM for specialist agents and synthesizer."""
-    global _llm_instance
-    if _llm_instance is None:
-        model = settings.LLM_MODEL
-        logger.info(f"Initializing main LLM: {model}")
-        _llm_instance = ChatOpenAI(
-            model=model,
-            temperature=0,
-            openai_api_key=settings.OPENROUTER_API_KEY,
-            openai_api_base="https://openrouter.ai/api/v1",
-            streaming=True,
-            max_tokens=4096,
-            timeout=60,
-        )
-    return _llm_instance
-
-
-def get_planner_llm() -> ChatOpenAI:
-    """Fast LLM for query rewriting (structured output)."""
-    global _planner_llm_instance
-    if _planner_llm_instance is None:
-        model = getattr(settings, "ROUTER_MODEL", "openai/gpt-4o-mini")
-        logger.info(f"Initializing planner LLM: {model}")
-        _planner_llm_instance = ChatOpenAI(
-            model=model,
-            temperature=0,
-            openai_api_key=settings.OPENROUTER_API_KEY,
-            openai_api_base="https://openrouter.ai/api/v1",
-            streaming=False,
-            max_tokens=512,
-            timeout=20,
-        )
-    return _planner_llm_instance
+from app.services.llm import get_llm, get_planner_llm
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -838,6 +802,33 @@ async def intent_check_node(state: PipelineState, config: RunnableConfig) -> dic
     # 2. detect intent (hybrid)
     intent = await _detect_intent_hybrid(query, config)
 
+    # ── Safety net: GENERAL intent bypasses full orchestration ──
+    if intent == "GENERAL":
+        logger.info(f"IntentCheck: GENERAL intent — injecting direct plan (safety net)")
+        return {
+            "intent_check": {
+                "intent": "GENERAL",
+                "confidence": 0.95,
+                "completeness_score": 1.0,
+                "ambiguity_score": 0.0,
+                "missing_fields": [],
+                "decision": "EXECUTE",
+            },
+            "query_plan": {
+                "tasks": [
+                    {
+                        "id": "task_1",
+                        "intent": "GENERAL",
+                        "query": query,
+                        "priority": 1,
+                        "requires": [],
+                    }
+                ],
+                "entities": {},
+                "complexity": "LOW",
+            },
+        }
+
     # 3. compute completeness
     completeness, missing = _compute_completeness(intent, features)
 
@@ -1160,8 +1151,32 @@ async def run_agent_query(
     Returns:
         dict with 'output', 'sources', 'route', 'pipeline_meta', 'error'.
     """
-    logger.info(f"Running query: '{user_input[:50]}...'")
+    # ── ROUTING LAYER ──────────────────────────────────────────────────────────
+    route_type, lightweight_res = await route_message(user_input)
 
+    if route_type in ("static", "no_tool"):
+        logger.info(f"Query handled by router ({route_type}). Bypassing graph.")
+        return {
+            "output": lightweight_res,
+            "sources": [],
+            "route": route_type.upper(),
+            "pipeline_meta": {
+                "route": route_type,
+                "pipeline_invoked": False,
+                "tasks_run": 0,
+                "clarified": False,
+                "response_mode": "router",
+                "complexity": "LOW",
+            },
+            "routing_meta": {
+                "route": route_type,
+                "pipeline_invoked": False,
+            },
+            "error": False,
+        }
+
+    # ── GRAPH EXECUTION ────────────────────────────────────────────────────────
+    logger.info(f"Running query: '{user_input[:50]}...'")
     graph = get_pipeline()
     messages = _build_messages(user_input, chat_history)
     config = _get_langfuse_config(session_id=session_id)
@@ -1184,10 +1199,16 @@ async def run_agent_query(
             "sources": sources,
             "route": route,
             "pipeline_meta": {
+                "route": "tool",
+                "pipeline_invoked": True,
                 "tasks_run": len(result.get("agent_results", [])),
                 "clarified": result.get("error") == "clarification_needed",
                 "response_mode": result.get("last_response_mode"),
                 "complexity": plan.get("complexity") if plan else None,
+            },
+            "routing_meta": {
+                "route": "tool",
+                "pipeline_invoked": True,
             },
             "error": False,
         }
@@ -1199,6 +1220,7 @@ async def run_agent_query(
             "sources": [],
             "route": "ERROR",
             "pipeline_meta": {"tasks_run": 0, "clarified": False, "response_mode": None, "complexity": None},
+            "routing_meta": {"route": "error", "pipeline_invoked": True},
             "error": True,
         }
 
@@ -1218,6 +1240,53 @@ async def stream_agent_query(
     """
     logger.info(f"Streaming query: '{user_input[:50]}...'")
 
+    # ── ROUTING LAYER ──────────────────────────────────────────────────────────
+    route_type, lightweight_res = await route_message(user_input)
+
+    if route_type in ("static", "no_tool"):
+        logger.info(f"Query handled by router ({route_type}). Bypassing graph.")
+        # Yield metadata immediately
+        yield {
+            "type": "node_start",
+            "node": "router",
+            "display": "Responding",
+        }
+        
+        if route_type == "static":
+            # Stream the response back in chunks
+            yield {
+                "type": "token",
+                "content": lightweight_res,
+                "node": "router",
+            }
+        else:
+            async for word in stream_no_tool_response(user_input):
+                yield {
+                    "type": "token",
+                    "content": word,
+                    "node": "router",
+                }
+
+        yield {
+            "type": "done",
+            "sources": [],
+            "node": "router",
+            "pipeline_meta": {
+                "route": route_type,
+                "pipeline_invoked": False,
+                "tasks_run": 0,
+                "clarified": False,
+                "response_mode": "router",
+                "complexity": "LOW",
+            },
+            "routing_meta": {
+                "route": route_type,
+                "pipeline_invoked": False,
+            },
+        }
+        return
+
+    # ── GRAPH EXECUTION ────────────────────────────────────────────────────────
     graph = get_pipeline()
     messages = _build_messages(user_input, chat_history)
     config = _get_langfuse_config(session_id=session_id)
@@ -1319,10 +1388,16 @@ async def stream_agent_query(
                     "sources": _dedup_sources(accumulated_sources),
                     "node": current_node,
                     "pipeline_meta": {
+                        "route": "tool",
+                        "pipeline_invoked": True,
                         "tasks_run": len(final_state.get("agent_results", [])),
                         "clarified": final_state.get("error") == "clarification_needed",
                         "response_mode": final_state.get("last_response_mode"),
                         "complexity": plan.get("complexity") if plan else None,
+                    },
+                    "routing_meta": {
+                        "route": "tool",
+                        "pipeline_invoked": True,
                     },
                 }
 

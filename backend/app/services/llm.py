@@ -11,6 +11,11 @@ logger = logging.getLogger(__name__)
 
 
 
+from langchain_openai import ChatOpenAI
+
+_llm_instance = None
+_planner_llm_instance = None
+
 # ── 2. Streaming (Unchanged) ──────────────────────────────────────────────
 async def generate_answer_stream(
     query: str, 
@@ -69,3 +74,39 @@ async def generate_answer_structured(
             "text": f"Could not generate structured response: {str(e)}. Please try again or switch to Explainer Mode."
         }]
     }
+
+# ── 4. Agent Singletons ───────────────────────────────────────────────────
+
+def get_llm() -> ChatOpenAI:
+    """Main LLM for specialist agents and synthesizer."""
+    global _llm_instance
+    if _llm_instance is None:
+        model = settings.LLM_MODEL
+        logger.info(f"Initializing main LLM: {model}")
+        _llm_instance = ChatOpenAI(
+            model=model,
+            temperature=0,
+            openai_api_key=settings.OPENROUTER_API_KEY,
+            openai_api_base="https://openrouter.ai/api/v1",
+            streaming=True,
+            max_tokens=4096,
+            timeout=60,
+        )
+    return _llm_instance
+
+def get_planner_llm() -> ChatOpenAI:
+    """Fast LLM for query rewriting (structured output)."""
+    global _planner_llm_instance
+    if _planner_llm_instance is None:
+        model = getattr(settings, "ROUTER_MODEL", "openai/gpt-4o-mini")
+        logger.info(f"Initializing planner LLM: {model}")
+        _planner_llm_instance = ChatOpenAI(
+            model=model,
+            temperature=0,
+            openai_api_key=settings.OPENROUTER_API_KEY,
+            openai_api_base="https://openrouter.ai/api/v1",
+            streaming=False,
+            max_tokens=4096,
+            timeout=30,
+        )
+    return _planner_llm_instance
