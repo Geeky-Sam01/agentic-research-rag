@@ -127,6 +127,9 @@ model = ONNXEmbedder(str(_onnx_model_path))
 embedding_cache = {}
 
 
+MAX_CACHE_SIZE = 500
+
+
 async def get_embedding(text: str) -> List[float]:
     """Get embedding for a single text using local ONNX model."""
 
@@ -139,6 +142,11 @@ async def get_embedding(text: str) -> List[float]:
         embedding = await asyncio.to_thread(model.encode, text)
 
         embedding_list = embedding.tolist()
+
+        # Evict oldest entry if cache is full (simple FIFO)
+        if len(embedding_cache) >= MAX_CACHE_SIZE:
+            oldest_key = next(iter(embedding_cache))
+            del embedding_cache[oldest_key]
 
         embedding_cache[text] = embedding_list
 

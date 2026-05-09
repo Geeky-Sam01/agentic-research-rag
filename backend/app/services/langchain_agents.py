@@ -20,6 +20,7 @@ from enum import Enum
 from typing import Annotated, AsyncGenerator, List, Literal, Optional
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import create_react_agent
@@ -85,6 +86,7 @@ class PipelineState(TypedDict):
     agent_results: Annotated[list[dict], _append_results]
     sources: list[dict]
     error: Optional[str]
+    last_response_mode: Optional[str]  # "concise" | "analytical" | "detailed"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -212,7 +214,7 @@ CATEGORIES = ["large cap", "mid cap", "small cap", "flexi cap", "debt", "hybrid"
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-async def rewriter_node(state: PipelineState) -> dict:
+async def rewriter_node(state: PipelineState, config: RunnableConfig) -> dict:
     """Decompose the user query into a structured QueryPlan."""
     messages = state["messages"]
     user_query = messages[-1].content if messages else ""
@@ -223,11 +225,18 @@ async def rewriter_node(state: PipelineState) -> dict:
         prior_messages = messages[:-1][-6:]  # Up to 3 prior turns
         planner_msgs = [SystemMessage(content=QUERY_REWRITER_PROMPT)]
         planner_msgs.extend(prior_messages)
+
+        # Consume ambiguity hint from intent_check FALLBACK path
+        ambiguity_hint = state.get("shared_context", {}).get("_ambiguity_hint")
+        if ambiguity_hint:
+            logger.info(f"Rewriter: injecting ambiguity hint: {ambiguity_hint[:80]}")
+            planner_msgs.append(SystemMessage(content=f"[PLANNER NOTE] {ambiguity_hint}"))
+
         planner_msgs.append(HumanMessage(content=f"User Query: {user_query}"))
 
         # method="function_calling" avoids strict additionalProperties enforcement
         planner = get_planner_llm().with_structured_output(QueryPlan, method="function_calling")
-        plan: QueryPlan = await planner.ainvoke(planner_msgs)
+        plan: QueryPlan = await planner.ainvoke(planner_msgs, config=config)
         # Hard cap: max 3 tasks
         if len(plan.tasks) > 3:
             plan.tasks = plan.tasks[:3]
@@ -249,7 +258,7 @@ async def rewriter_node(state: PipelineState) -> dict:
         return {"query_plan": fallback.model_dump(), "shared_context": {}}
 
 
-async def controller_node(state: PipelineState) -> dict:
+async def controller_node(state: PipelineState, config: RunnableConfig) -> dict:
     """Validate plan, enforce guardrails, order tasks for execution."""
     plan = QueryPlan(**state["query_plan"])
     logger.info(f"Controller: {len(plan.tasks)} tasks, complexity={plan.complexity}")
@@ -301,15 +310,28 @@ async def controller_node(state: PipelineState) -> dict:
 
 
 def _topo_sort(tasks: List[SubTask]) -> List[SubTask]:
-    """Sort tasks respecting `requires` dependencies, then by priority."""
-    task_map = {t.id: t for t in tasks}
-    visited, result = set(), []
+    """Sort tasks respecting `requires` dependencies, then by priority.
 
-    def visit(tid: str):
+    Includes cycle detection: if a circular dependency is found, the offending
+    task is skipped with a log error rather than causing infinite recursion.
+    """
+    task_map = {t.id: t for t in tasks}
+    visited: set = set()
+    in_progress: set = set()  # tracks the current DFS path for cycle detection
+    result: list = []
+
+    def visit(tid: str) -> None:
         if tid in visited or tid not in task_map:
             return
+        if tid in in_progress:
+            logger.error(
+                f"_topo_sort: cycle detected at task '{tid}' — skipping to prevent infinite recursion"
+            )
+            return
+        in_progress.add(tid)
         for dep in task_map[tid].requires:
             visit(dep)
+        in_progress.discard(tid)
         visited.add(tid)
         result.append(task_map[tid])
 
@@ -318,7 +340,7 @@ def _topo_sort(tasks: List[SubTask]) -> List[SubTask]:
     return result
 
 
-async def executor_node(state: PipelineState) -> dict:
+async def executor_node(state: PipelineState, config: RunnableConfig) -> dict:
     """Run the current task's specialist agent with strict dependency enforcement.
 
     Stages:
@@ -386,7 +408,7 @@ async def executor_node(state: PipelineState) -> dict:
     agent_msgs.append(HumanMessage(content=task.query))
 
     # ── STAGE 3: EXECUTE ──
-    answer, extracted, sources = await _run_agent(intent, agent_msgs)
+    answer, extracted, sources = await _run_agent(intent, agent_msgs, config)
 
     # ── STAGE 4: POST-CHECK — verify dependency usage ──
     dep_scheme = None
@@ -414,7 +436,7 @@ async def executor_node(state: PipelineState) -> dict:
                 )
             )
         )
-        answer, extracted, sources = await _run_agent(intent, retry_msgs)
+        answer, extracted, sources = await _run_agent(intent, retry_msgs, config)
 
         used_code = str(extracted.get("scheme_code", ""))
         if used_code != dep_scheme:
@@ -451,7 +473,10 @@ async def executor_node(state: PipelineState) -> dict:
         success=success,
         error=None if success else "Agent produced no usable data",
     )
-    logger.info(f"Executor: '{task.id}' done. success={ar.success}, {len(answer)} chars")
+    logger.info(
+        f"Executor: '{task.id}' done. success={ar.success}, {len(answer)} chars, "
+        f"shared_context keys={list(updated_ctx.keys())}"
+    )
 
     return {
         "current_task_index": idx + 1,
@@ -461,11 +486,11 @@ async def executor_node(state: PipelineState) -> dict:
     }
 
 
-async def _run_agent(intent: str, agent_msgs: list) -> tuple[str, dict, list]:
+async def _run_agent(intent: str, agent_msgs: list, config: RunnableConfig) -> tuple[str, dict, list]:
     """Execute a specialist agent and extract answer, data, and sources."""
     try:
         agent = _get_agent(intent)
-        result = await agent.ainvoke({"messages": agent_msgs})
+        result = await agent.ainvoke({"messages": agent_msgs}, config=config)
         out_msgs = result.get("messages", [])
 
         # Extract final answer
@@ -507,7 +532,7 @@ def _extract_tool_data(messages: list) -> dict:
 
             # Handle discovery tool outputs (keys are scheme codes)
             numeric_keys = [k for k in c.keys() if str(k).isdigit() and len(str(k)) >= 5]
-            if numeric_keys:
+            if len(numeric_keys) == 1:
                 data["scheme_code"] = numeric_keys[0]
                 data["fund"] = c[numeric_keys[0]]
 
@@ -520,8 +545,15 @@ def _extract_tool_data(messages: list) -> dict:
                 ("scheme_name", "fund"),
                 ("Scheme Name", "fund"),
                 ("fund_house", "amc"),
+                ("Fund House", "amc"),
                 ("date", "date"),
                 ("Date", "date"),
+                ("expense_ratio", "expense_ratio"),
+                ("Expense Ratio", "expense_ratio"),
+                ("exit_load", "exit_load"),
+                ("Exit Load", "exit_load"),
+                ("scheme_category", "category"),
+                ("Scheme Category", "category"),
             ]:
                 if key in c and c[key]:
                     data[field] = c[key]
@@ -529,9 +561,55 @@ def _extract_tool_data(messages: list) -> dict:
             continue
     return data
 
+# ──────────────────────────────────────────────────────────────────────────────
+# SYNTHESIZER HELPERS
+# ──────────────────────────────────────────────────────────────────────────────
 
-async def synthesizer_node(state: PipelineState) -> dict:
-    """Merge agent results into a final response."""
+_FOLLOWUP_KEYWORDS = {"why", "how", "explain", "details", "more", "which", "better", "compare", "analysis", "should"}
+_REFERENCE_WORDS = {"this", "that", "it", "those"}
+
+
+def _is_followup_query(messages: list) -> bool:
+    """Return True if the latest user message looks like a follow-up.
+
+    Conditions (any one triggers follow-up):
+    1. Short message (≤6 words) preceded by an AI response
+    2. Contains follow-up keywords (why, how, explain, ...)
+    3. Contains reference words (this, that, it, those)
+    """
+    if len(messages) < 2:
+        return False
+
+    # The previous turn must be an AI message for this to be a follow-up
+    prev = messages[-2]
+    if not isinstance(prev, AIMessage):
+        return False
+
+    last = messages[-1]
+    text = (last.content or "").strip().lower()
+    words = text.split()
+
+    if len(words) <= 6:
+        return True
+    if _FOLLOWUP_KEYWORDS & set(words):
+        return True
+    if _REFERENCE_WORDS & set(words):
+        return True
+    return False
+
+
+def _auto_detect_mode(successful: list, results: list) -> str:
+    """Determine response_mode from agent results alone (no follow-up logic)."""
+    if len(successful) == 1 and successful[0]["intent"] == "DATA":
+        if successful[0].get("data", {}).get("nav"):
+            return "concise"
+    if any(r["intent"] == "PERFORMANCE" for r in successful) or len(successful) > 1:
+        return "analytical"
+    return "detailed"
+
+
+async def synthesizer_node(state: PipelineState, config: RunnableConfig) -> dict:
+    """Merge agent results into a final, mode-adaptive response."""
     results = state.get("agent_results", [])
     messages = state["messages"]
     user_query = messages[-1].content if messages else ""
@@ -546,49 +624,56 @@ async def synthesizer_node(state: PipelineState) -> dict:
     if any(r.get("intent") == "DATA" and not r.get("data") for r in results):
         logger.warning("Synthesizer: DATA intent missing required data. Failing cleanly.")
         return {
-            "messages": [
-                AIMessage(
-                    content="I couldn't retrieve the latest NAV. Please try again."
-                )
-            ],
+            "messages": [AIMessage(content="I couldn't retrieve the requested data. This can happen if the fund details are currently unavailable or the query was ambiguous. Please try with a specific fund name.")],
             "sources": [],
+            "last_response_mode": state.get("last_response_mode"),
         }
 
-    # ── Response Mode Detection ──
-    response_mode = "detailed"
-    if len(successful) == 1 and successful[0]["intent"] == "DATA":
-        r = successful[0]
-        if r.get("data") and r["data"].get("nav"):
-            response_mode = "concise"
-    elif any(r["intent"] == "PERFORMANCE" for r in successful) or len(successful) > 1:
-        response_mode = "analytical"
+    # ── Follow-up Detection ──
+    is_followup = _is_followup_query(messages)
+    prev_mode = state.get("last_response_mode")
 
-    logger.info(f"Synthesizer: using '{response_mode}' mode")
+    # ── Response Mode Selection ──
+    if is_followup and prev_mode in ("concise", "analytical"):
+        response_mode = "detailed"
+        logger.info(f"Synthesizer: follow-up detected (prev={prev_mode}), upgrading to 'detailed'")
+    else:
+        response_mode = _auto_detect_mode(successful, results)
+        logger.info(f"Synthesizer: using '{response_mode}' mode")
 
-    # ── Implement Concise Mode (No LLM Call) ──
+    # ── Concise Mode — deterministic, no LLM call ──
     if response_mode == "concise":
         r = successful[0]
         val = r["data"]["nav"]
         date = r["data"].get("date", "Latest")
-        fund_name = state.get("shared_context", {}).get("fund") or r["data"].get("fund", "Requested Fund")
-        
-        # Prefer Direct Growth context if lacking
+        fund_name = (
+            state.get("shared_context", {}).get("fund")
+            or r["data"].get("fund", "Requested Fund")
+        )
         if "Direct" not in fund_name and "Regular" not in fund_name:
             fund_name += " (Direct Growth)"
 
-        ans = f"{fund_name}\n\nNAV: ₹{val}\nAs of: {date}\n\n_Ask if you want more details._"
-        return {"messages": [AIMessage(content=ans)], "sources": r.get("sources", [])}
+        ans = f"{fund_name}\n\nNAV: \u20b9{val}\nAs of: {date}\n\n_(Ask for details if needed)_"
+        return {
+            "messages": [AIMessage(content=ans)],
+            "sources": r.get("sources", []),
+            "last_response_mode": "concise",
+        }
 
-    # ── No results: fallback ──
+    # ── No successful results ──
     if not successful:
         fallback = "I wasn't able to find that information. Could you rephrase or provide more details?"
         if failed:
             errors = [r.get("error", "Unknown") for r in failed if r.get("error")]
             if errors:
                 fallback += f"\n\n_(Errors: {'; '.join(errors)})_"
-        return {"messages": [AIMessage(content=fallback)], "sources": []}
+        return {
+            "messages": [AIMessage(content=fallback)],
+            "sources": [],
+            "last_response_mode": response_mode,
+        }
 
-    # ── Analytical / Detailed Mode: synthesize via LLM ──
+    # ── Analytical / Detailed Mode — LLM synthesis ──
     try:
         agent_outputs_text = ""
         all_sources = []
@@ -598,28 +683,46 @@ async def synthesizer_node(state: PipelineState) -> dict:
             agent_outputs_text += r.get("answer", "(no output)") + "\n"
             all_sources.extend(r.get("sources", []))
 
+        # Append follow-up instruction to system prompt
+        followup_note = (
+            "\n\nIMPORTANT: This is a follow-up question. Expand on the previous answer using context."
+            if is_followup
+            else ""
+        )
+
         synth_prompt = SYNTHESIZER_PROMPT.format(
             user_query=user_query,
             complexity=plan_dict.get("complexity", "MEDIUM"),
             response_mode=response_mode,
             agent_outputs=agent_outputs_text,
+        ) + followup_note
+
+        # Build message list — inject prior AI turn for follow-up context
+        synth_msgs: list = [SystemMessage(content=synth_prompt)]
+        if is_followup and len(messages) >= 2 and isinstance(messages[-2], AIMessage):
+            synth_msgs.append(AIMessage(content=f"[Previous answer]:\n{messages[-2].content}"))
+        synth_msgs.append(
+            HumanMessage(content=f"Original question: {user_query}\n\nSynthesize the above into a clear answer.")
         )
 
-        response = await get_llm().ainvoke(
-            [
-                SystemMessage(content=synth_prompt),
-                HumanMessage(content=f"Original question: {user_query}\n\nSynthesize the above into a clear answer."),
-            ]
-        )
-        return {"messages": [AIMessage(content=response.content)], "sources": all_sources}
+        response = await get_llm().ainvoke(synth_msgs, config=config)
+        return {
+            "messages": [AIMessage(content=response.content)],
+            "sources": all_sources,
+            "last_response_mode": response_mode,
+        }
 
     except Exception as e:
         logger.error(f"Synthesizer LLM failed: {e}")
         combined = "\n\n---\n\n".join(r["answer"] for r in successful if r.get("answer"))
-        return {"messages": [AIMessage(content=combined or "Unable to synthesize.")], "sources": []}
+        return {
+            "messages": [AIMessage(content=combined or "Unable to synthesize.")],
+            "sources": [],
+            "last_response_mode": response_mode,
+        }
 
 
-async def _detect_intent_hybrid(q: str) -> str:
+async def _detect_intent_hybrid(q: str, config: RunnableConfig) -> str:
     ql = q.lower()
     # 1. High-confidence deterministic rules
     if any(k in ql for k in ["nav", "current price"]):
@@ -638,7 +741,8 @@ async def _detect_intent_hybrid(q: str) -> str:
                     content="Classify the mutual fund query intent: DATA (nav/price), PERFORMANCE (best/compare/returns), DISCOVERY (search/list), DOCUMENT (holdings/strategy), CALCULATOR (sip maths), GENERAL (chitchat/basics)."
                 ),
                 HumanMessage(content=q),
-            ]
+            ],
+            config=config
         )
         return res.intent
     except Exception:
@@ -704,7 +808,10 @@ def _compute_completeness(intent: str, features: dict) -> tuple[float, List[str]
 
 
 def _compute_ambiguity(features: dict, completeness: float) -> float:
-    keyword_penalty = 0.2 if features["is_comparative"] else 0.0
+    # Only penalise comparative queries that lack fund/category context.
+    # "Best large-cap funds for 5 years" has context — no penalty.
+    has_context = features["has_fund"] or features["has_category"]
+    keyword_penalty = 0.2 if features["is_comparative"] and not has_context else 0.0
     short_penalty = 0.2 if features["is_short"] else 0.0
     # lower completeness → higher ambiguity
     base = 1.0 - completeness
@@ -721,7 +828,7 @@ def _decide(completeness: float, ambiguity: float) -> str:
         return "EXECUTE"
 
 
-async def intent_check_node(state: PipelineState) -> dict:
+async def intent_check_node(state: PipelineState, config: RunnableConfig) -> dict:
     messages = state["messages"]
     query = messages[-1].content if messages else ""
 
@@ -729,7 +836,7 @@ async def intent_check_node(state: PipelineState) -> dict:
     features = _extract_features(query)
 
     # 2. detect intent (hybrid)
-    intent = await _detect_intent_hybrid(query)
+    intent = await _detect_intent_hybrid(query, config)
 
     # 3. compute completeness
     completeness, missing = _compute_completeness(intent, features)
@@ -745,7 +852,7 @@ async def intent_check_node(state: PipelineState) -> dict:
 
     result = IntentCheckResult(
         intent=intent,
-        confidence=0.8,  # deterministic path
+        confidence=round(max(0.0, min(1.0, completeness * (1.0 - ambiguity * 0.5))), 2),
         completeness_score=completeness,
         ambiguity_score=ambiguity,
         missing_fields=missing,
@@ -781,15 +888,23 @@ async def intent_check_node(state: PipelineState) -> dict:
             return {"intent_check": result.model_dump(), "query_plan": fallback_plan}
         else:
             # If we don't have a specific fallback plan for this intent,
-            # we just pass through to the rewriter to let the LLM handle the ambiguity.
-            logger.info("IntentCheck: FALLBACK triggered but intent is not PERFORMANCE. Passing to rewriter.")
-            return {"intent_check": result.model_dump()}
+            # inject an ambiguity hint into shared_context so the rewriter
+            # knows it is handling a partially-ambiguous query.
+            hint = (
+                f"Query is partially ambiguous (missing: {missing}). "
+                "Use reasonable defaults and attempt to answer."
+            )
+            logger.info("IntentCheck: FALLBACK triggered, injecting ambiguity hint for rewriter.")
+            return {
+                "intent_check": result.model_dump(),
+                "shared_context": {"_ambiguity_hint": hint},
+            }
 
     # EXECUTE → go to rewriter
     return {"intent_check": result.model_dump()}
 
 
-async def clarify_node(state: PipelineState) -> dict:
+async def clarify_node(state: PipelineState, config: RunnableConfig) -> dict:
     """Context-aware clarifier — dynamically builds targeted questions based on missing fields."""
     intent_check = state.get("intent_check") or {}
 
@@ -879,12 +994,16 @@ def route_after_rewriter(state: PipelineState) -> str:
 
 def should_continue(state: PipelineState) -> str:
     """After executor: route to clarify on dependency failure, loop if more tasks, else synthesize."""
+    MAX_TASKS = 5  # circuit-breaker: prevent infinite loops on dependency bugs
     error = state.get("error")
     if error in ("dependency_failed", "dependency_not_used"):
         logger.warning(f"Executor routing to clarify due to: {error}")
         return "clarify"
     idx = state.get("current_task_index", 0)
     pending = state.get("pending_tasks", [])
+    if idx >= MAX_TASKS:
+        logger.error(f"Executor: MAX_TASKS={MAX_TASKS} guard triggered, forcing synthesizer")
+        return "synthesizer"
     if idx < len(pending):
         return "executor"
     return "synthesizer"
@@ -932,6 +1051,13 @@ def build_pipeline():
     return g.compile()
 
 
+def _warm_agent_cache() -> None:
+    """Pre-create all ReAct agents at startup to avoid async race conditions."""
+    for intent in AGENT_CONFIG:
+        _get_agent(intent)
+    logger.info(f"Agent cache warmed: {list(_cached_agents.keys())}")
+
+
 _graph_instance = None
 
 
@@ -940,6 +1066,7 @@ def get_pipeline():
     global _graph_instance
     if _graph_instance is None:
         _graph_instance = build_pipeline()
+        _warm_agent_cache()
     return _graph_instance
 
 
@@ -949,17 +1076,27 @@ def get_pipeline():
 
 
 def _build_messages(user_input: str, chat_history: List[BaseMessage] = None) -> List[BaseMessage]:
-    """Build message list from user input and optional chat history."""
+    """Build message list from user input and optional chat history.
+
+    CONTRACT: For follow-up detection to work, chat_history must include the
+    preceding AIMessage from the last pipeline response as its final element.
+    """
     messages = []
     if chat_history:
         for msg in chat_history:
             if isinstance(msg, (HumanMessage, AIMessage)):
                 messages.append(msg)
+        # Defensive: warn if follow-up detection will be blind
+        if messages and not isinstance(messages[-1], AIMessage):
+            logger.warning(
+                "_build_messages: chat_history does not end with AIMessage "
+                "— follow-up detection disabled for this request"
+            )
     messages.append(HumanMessage(content=user_input))
     return messages
 
 
-def _initial_state(messages: List[BaseMessage]) -> dict:
+def _initial_state(messages: List[BaseMessage], last_response_mode: Optional[str] = None) -> dict:
     """Build the initial PipelineState dict for graph invocation."""
     return {
         "messages": messages,
@@ -971,6 +1108,7 @@ def _initial_state(messages: List[BaseMessage]) -> dict:
         "agent_results": [],
         "sources": [],
         "error": None,
+        "last_response_mode": last_response_mode,
     }
 
 
@@ -982,11 +1120,24 @@ def _extract_final_output(messages: List[BaseMessage]) -> str:
     return ""
 
 
-def _get_langfuse_config() -> dict:
+def _dedup_sources(sources: list) -> list:
+    """Deduplicate sources by URL, falling back to title or string repr."""
+    seen: set = set()
+    out: list = []
+    for s in sources:
+        key = s.get("url") or s.get("title") or str(s)
+        if key not in seen:
+            seen.add(key)
+            out.append(s)
+    return out
+
+
+def _get_langfuse_config(session_id: str = None, user_id: str = None) -> dict:
     """Build config dict with Langfuse callback if available."""
     if _langfuse_available:
         try:
-            return {"callbacks": [LangfuseHandler()]}
+            handler = LangfuseHandler(session_id=session_id, user_id=user_id)
+            return {"callbacks": [handler]}
         except Exception:
             pass
     return {}
@@ -1000,28 +1151,31 @@ def _get_langfuse_config() -> dict:
 async def run_agent_query(
     user_input: str,
     chat_history: List[BaseMessage] = None,
+    last_response_mode: Optional[str] = None,
+    session_id: Optional[str] = None,
 ) -> dict:
     """
     Run a query through the agentic pipeline (non-streaming).
 
     Returns:
-        dict with 'output', 'sources', 'route', 'error'.
+        dict with 'output', 'sources', 'route', 'pipeline_meta', 'error'.
     """
     logger.info(f"Running query: '{user_input[:50]}...'")
 
     graph = get_pipeline()
     messages = _build_messages(user_input, chat_history)
-    config = _get_langfuse_config()
+    config = _get_langfuse_config(session_id=session_id)
 
     try:
-        result = await graph.ainvoke(_initial_state(messages), config=config)
+        result = await graph.ainvoke(
+            _initial_state(messages, last_response_mode=last_response_mode), config=config
+        )
 
         final_output = _extract_final_output(result["messages"])
         plan = result.get("query_plan", {})
-        # Derive route from first task's intent for backward compat
         tasks = plan.get("tasks", []) if plan else []
         route = tasks[0]["intent"] if tasks else "GENERAL"
-        sources = result.get("sources", [])
+        sources = _dedup_sources(result.get("sources", []))
 
         logger.info(f"Query complete. Route: {route}, Output: {len(final_output)} chars")
 
@@ -1029,6 +1183,12 @@ async def run_agent_query(
             "output": final_output,
             "sources": sources,
             "route": route,
+            "pipeline_meta": {
+                "tasks_run": len(result.get("agent_results", [])),
+                "clarified": result.get("error") == "clarification_needed",
+                "response_mode": result.get("last_response_mode"),
+                "complexity": plan.get("complexity") if plan else None,
+            },
             "error": False,
         }
 
@@ -1038,6 +1198,7 @@ async def run_agent_query(
             "output": "I encountered an error processing your request. Please try again.",
             "sources": [],
             "route": "ERROR",
+            "pipeline_meta": {"tasks_run": 0, "clarified": False, "response_mode": None, "complexity": None},
             "error": True,
         }
 
@@ -1045,6 +1206,8 @@ async def run_agent_query(
 async def stream_agent_query(
     user_input: str,
     chat_history: List[BaseMessage] = None,
+    last_response_mode: Optional[str] = None,
+    session_id: Optional[str] = None,
 ) -> AsyncGenerator[dict, None]:
     """
     Stream a query through the agentic pipeline.
@@ -1057,7 +1220,7 @@ async def stream_agent_query(
 
     graph = get_pipeline()
     messages = _build_messages(user_input, chat_history)
-    config = _get_langfuse_config()
+    config = _get_langfuse_config(session_id=session_id)
 
     PIPELINE_NODES = {"intent_check", "rewriter", "controller", "executor", "synthesizer", "clarify"}
     DISPLAY_NAMES = {
@@ -1072,15 +1235,20 @@ async def stream_agent_query(
     try:
         current_node = None
         accumulated_sources = []
-        tokens_emitted = False  # Track whether synthesizer streamed any tokens
+        tokens_emitted_nodes: set = set()  # track per-node to allow independent passthroughs
+        final_state: dict = {}
 
         async for event in graph.astream_events(
-            _initial_state(messages),
+            _initial_state(messages, last_response_mode=last_response_mode),
             config=config,
             version="v2",
         ):
             kind = event["event"]
             name = event.get("name", "")
+
+            # Capture final state for pipeline_meta
+            if kind == "on_chain_end" and name == "LangGraph":
+                final_state = event["data"].get("output", {})
 
             # Node transitions
             if kind == "on_chain_start" and name in PIPELINE_NODES:
@@ -1098,16 +1266,16 @@ async def stream_agent_query(
                     continue
                 chunk = event["data"].get("chunk")
                 if chunk and hasattr(chunk, "content") and chunk.content:
-                    tokens_emitted = True
+                    tokens_emitted_nodes.add(current_node)
                     yield {
                         "type": "token",
                         "content": chunk.content,
                         "node": current_node,
                     }
 
-            # Synthesizer passthrough: single-result skips LLM → emit content directly
+            # Synthesizer passthrough: concise/guard modes skip LLM → emit content directly
             elif kind == "on_chain_end" and name == "synthesizer":
-                if not tokens_emitted:
+                if "synthesizer" not in tokens_emitted_nodes:
                     output = event["data"].get("output", {})
                     msgs = output.get("messages", [])
                     for msg in msgs:
@@ -1118,7 +1286,7 @@ async def stream_agent_query(
 
             # Clarify passthrough: static return, no LLM → emit content directly
             elif kind == "on_chain_end" and name == "clarify":
-                if not tokens_emitted:
+                if "clarify" not in tokens_emitted_nodes:
                     output = event["data"].get("output", {})
                     msgs = output.get("messages", [])
                     for msg in msgs:
@@ -1145,7 +1313,18 @@ async def stream_agent_query(
 
             # Graph completion
             elif kind == "on_chain_end" and name == "LangGraph":
-                yield {"type": "done", "sources": accumulated_sources, "node": current_node}
+                plan = final_state.get("query_plan") or {}
+                yield {
+                    "type": "done",
+                    "sources": _dedup_sources(accumulated_sources),
+                    "node": current_node,
+                    "pipeline_meta": {
+                        "tasks_run": len(final_state.get("agent_results", [])),
+                        "clarified": final_state.get("error") == "clarification_needed",
+                        "response_mode": final_state.get("last_response_mode"),
+                        "complexity": plan.get("complexity") if plan else None,
+                    },
+                }
 
     except Exception as e:
         logger.error(f"Streaming error: {str(e)}", exc_info=True)

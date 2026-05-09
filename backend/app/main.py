@@ -20,6 +20,12 @@ async def lifespan(app: FastAPI):
     init_ocr()
     yield
     logger.info("Shutting down Agentic Research RAG API...")
+    try:
+        from langfuse import Langfuse
+        Langfuse().flush()
+        logger.info("Flushed Langfuse traces.")
+    except Exception as e:
+        logger.error(f"Error flushing Langfuse: {e}")
 
 # Initialize FastAPI app
 app = FastAPI(

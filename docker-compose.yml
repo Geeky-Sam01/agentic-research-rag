@@ -5,6 +5,8 @@ services:
       - "8000:8000"
     env_file:
       - ./backend/.env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@postgres:5432/finsight_chat
     volumes:
       - qdrant_data:/app/qdrant_db # Persist Qdrant data
       - ./backend/uploads:/app/uploads # Persist uploaded files
@@ -27,5 +29,18 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: finsight_chat
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
 volumes:
   qdrant_data:
+  pgdata:

@@ -20,7 +20,7 @@ export class LeftPanelComponent {
 
   newChat() {
     this.chatService.clearMessages();
-    this.historyService.createNewChat();
+    this.historyService.currentSessionId.set(null);
   }
 
   loadChat(id: string) {

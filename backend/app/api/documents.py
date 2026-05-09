@@ -20,13 +20,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
 
-# ── Shared clients (initialised once at import time) ─────────────────────────
-_qdrant_client = get_client()
+# ── Shared clients (Initialised lazily) ──────────────────────────────────────
+# Using get_client() inside handlers to avoid premature locking during reload
 
- 
-ensure_collection(_qdrant_client)
- 
- 
 
 @router.post("/upload", response_model=DocumentUploadResponse)
 async def upload_document(
@@ -63,6 +59,9 @@ async def upload_document(
     logger.info(f"Received: {file.filename}  [{doc_type} / {fund_name} / {period}]")
  
     file_path = Path(settings.UPLOAD_PATH) / file.filename
+
+    client = get_client()
+    ensure_collection(client)
  
     try:
         
@@ -75,7 +74,7 @@ async def upload_document(
         
         if overwrite:
             logger.info(f"Overwrite=True -- deleting existing points for {file.filename}")
-            delete_document(file.filename, _qdrant_client)
+            delete_document(file.filename, client)
  
         
         #       extract → chunk → embed → upsert
@@ -85,7 +84,7 @@ async def upload_document(
             fund_name = fund_name,
             doc_type  = doc_type,
             period    = period,
-            client    = _qdrant_client,
+            client    = client,
             embedder  = _embedder,
         )
 
@@ -128,7 +127,8 @@ async def upload_document(
 async def get_stats():
     """Get knowledge base statistics from Qdrant."""
     try:
-        stats = get_collection_stats(_qdrant_client)
+        client = get_client()
+        stats = get_collection_stats(client)
         cache_stats = get_cache_stats()
 
         return {
@@ -144,7 +144,8 @@ async def get_stats():
 async def clear_index():
     """Clear the Qdrant collection."""
     try:
-        success = clear_collection(_qdrant_client)
+        client = get_client()
+        success = clear_collection(client)
 
         if success:
             return {"success": True, "message": "Collection cleared"}

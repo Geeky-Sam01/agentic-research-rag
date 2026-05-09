@@ -1,21 +1,21 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { Message, Chunk } from '../models/chat.models';
+import { environment } from '../../environments/environment';
 
 export interface ChatSession {
   id: string;
   title: string;
   timestamp: number;
-  messages: Message[];
-  chunks: Chunk[];
+  messages?: Message[];
+  chunks?: Chunk[];
 }
 
 @Injectable({ providedIn: 'root' })
 export class ChatHistoryService {
-  private readonly DB_NAME = 'AgenticRagDB';
-  private readonly STORE_NAME = 'chats';
-  private db: IDBDatabase | null = null;
-  private dbReady: Promise<IDBDatabase>;
-  private dbResolve!: (db: IDBDatabase) => void;
+  private http = inject(HttpClient);
+  private readonly BASE_URL = environment.apiUrl;
 
   sessions = signal<ChatSession[]>([]);
   currentSessionId = signal<string | null>(null);
@@ -81,124 +81,113 @@ export class ChatHistoryService {
   });
 
   constructor() {
-    this.dbReady = new Promise((resolve) => {
-      this.dbResolve = resolve;
-    });
-    this.initDB();
+    this.handleLegacyData();
+    this.loadSessions();
   }
 
-  private async initDB() {
-    const request = indexedDB.open(this.DB_NAME, 1);
+  private async handleLegacyData() {
+    const legacyCount = await this.countLegacyIndexedDBSessions();
+    if (legacyCount > 0) {
+      alert('Chat history has moved to the server. Previous conversations are not migrated.');
+      await this.clearLegacyIndexedDB();
+    }
+  }
 
-    request.onupgradeneeded = (event: any) => {
-      const db = event.target.result;
-      if (!db.objectStoreNames.contains(this.STORE_NAME)) {
-        db.createObjectStore(this.STORE_NAME, { keyPath: 'id' });
-      }
-    };
+  private async countLegacyIndexedDBSessions(): Promise<number> {
+    return new Promise((resolve) => {
+      const request = indexedDB.open('AgenticRagDB', 1);
+      request.onsuccess = (event: any) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains('chats')) {
+          resolve(0);
+          return;
+        }
+        const tx = db.transaction('chats', 'readonly');
+        const store = tx.objectStore('chats');
+        const countReq = store.count();
+        countReq.onsuccess = () => resolve(countReq.result || 0);
+        countReq.onerror = () => resolve(0);
+      };
+      request.onerror = () => resolve(0);
+    });
+  }
 
-    request.onsuccess = (event: any) => {
-      this.db = event.target.result;
-      this.dbResolve(this.db!);
-      this.loadSessions();
-    };
+  private async clearLegacyIndexedDB(): Promise<void> {
+    return new Promise((resolve) => {
+      const request = indexedDB.deleteDatabase('AgenticRagDB');
+      request.onsuccess = () => resolve();
+      request.onerror = () => resolve();
+    });
   }
 
   async loadSessions() {
-    const db = await this.dbReady;
-    const tx = db.transaction(this.STORE_NAME, 'readonly');
-    const store = tx.objectStore(this.STORE_NAME);
-    const request = store.getAll();
-
-    request.onsuccess = () => {
-      const all: ChatSession[] = request.result;
-      // Sort by latest
-      all.sort((a, b) => b.timestamp - a.timestamp);
-      this.sessions.set(all);
-    };
-  }
-
-  async createNewChat(): Promise<string> {
-    const newId = crypto.randomUUID();
-    const newSession: ChatSession = {
-      id: newId,
-      title: 'New Chat',
-      timestamp: Date.now(),
-      messages: [],
-      chunks: []
-    };
-
-    await this.saveSession(newSession);
-    this.currentSessionId.set(newId);
-    return newId;
-  }
-
-  async saveSession(session: ChatSession) {
-    const db = await this.dbReady;
-    const tx = db.transaction(this.STORE_NAME, 'readwrite');
-    const store = tx.objectStore(this.STORE_NAME);
-    store.put(session);
-
-    tx.oncomplete = () => {
-      this.loadSessions();
-    };
+    try {
+      const res = await firstValueFrom(this.http.get<{sessions: any[]}>(`${this.BASE_URL}/api/chat/sessions`));
+      if (res && res.sessions) {
+        const mapped: ChatSession[] = res.sessions.map(s => ({
+          id: s.id,
+          title: s.title,
+          timestamp: new Date(s.updated_at).getTime(),
+          messages: [],
+          chunks: []
+        }));
+        // Sort by latest
+        mapped.sort((a, b) => b.timestamp - a.timestamp);
+        this.sessions.set(mapped);
+      }
+    } catch (e) {
+      console.error("Failed to load sessions", e);
+    }
   }
 
   async getSession(id: string): Promise<ChatSession | null> {
-    const db = await this.dbReady;
-    return new Promise((resolve) => {
-      const tx = db.transaction(this.STORE_NAME, 'readonly');
-      const store = tx.objectStore(this.STORE_NAME);
-      const request = store.get(id);
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => resolve(null);
-    });
-  }
-
-  async updateCurrentSession(messages: Message[], chunks: Chunk[]) {
-    const id = this.currentSessionId();
-    if (!id) return;
-
-    const session = await this.getSession(id);
-    if (session) {
-      session.messages = messages;
-      session.chunks = chunks;
-      
-      // Update title if it's still 'New Chat' and we have at least one user message
-      if (session.title === 'New Chat' && messages.length > 0) {
-        const userMsg = messages.find(m => m.role === 'user');
-        if (userMsg) {
-          session.title = userMsg.content.slice(0, 40) + (userMsg.content.length > 40 ? '...' : '');
-        }
+    try {
+      const res = await firstValueFrom(this.http.get<{messages: any[]}>(`${this.BASE_URL}/api/chat/sessions/${id}/messages`));
+      if (res && res.messages) {
+        const session = this.sessions().find(s => s.id === id);
+        if (!session) return null;
+        
+        const messages: Message[] = res.messages.map(m => ({
+          id: m.id,
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+          timestamp: new Date(m.created_at),
+          citations: [],
+          isStreaming: false,
+          statusHistory: []
+        }));
+        
+        return {
+          ...session,
+          messages,
+          chunks: []
+        };
       }
-      
-      await this.saveSession(session);
+      return null;
+    } catch (e) {
+      console.error("Failed to fetch session", e);
+      return null;
     }
   }
 
   async deleteSession(id: string) {
-    const db = await this.dbReady;
-    const tx = db.transaction(this.STORE_NAME, 'readwrite');
-    const store = tx.objectStore(this.STORE_NAME);
-    store.delete(id);
-
-    tx.oncomplete = () => {
+    try {
+      await firstValueFrom(this.http.delete(`${this.BASE_URL}/api/chat/sessions/${id}`));
       if (this.currentSessionId() === id) {
         this.currentSessionId.set(null);
       }
-      this.loadSessions();
-    };
+      await this.loadSessions();
+    } catch (e) {
+      console.error("Failed to delete session", e);
+    }
   }
 
   async clearAllSessions() {
-    const db = await this.dbReady;
-    const tx = db.transaction(this.STORE_NAME, 'readwrite');
-    const store = tx.objectStore(this.STORE_NAME);
-    store.clear();
-
-    tx.oncomplete = () => {
-      this.currentSessionId.set(null);
-      this.sessions.set([]);
-    };
+    // Currently backend doesn't support clearAll. We can loop or add endpoint.
+    for (const session of this.sessions()) {
+      await this.deleteSession(session.id);
+    }
+    this.currentSessionId.set(null);
+    this.sessions.set([]);
   }
 }

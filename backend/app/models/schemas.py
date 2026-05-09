@@ -16,6 +16,7 @@ class DocumentUploadResponse(BaseModel):
 class QueryRequest(BaseModel):
     query: str
     stream: bool = True
+    session_id: Optional[str] = None
 
 class Source(BaseModel):
     text: str

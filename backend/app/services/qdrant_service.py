@@ -27,12 +27,16 @@ COLLECTION_NAME = "financial_docs"
 # ------------------------------------------------------------------ #
 
 _client_instance: Optional[QdrantClient] = None
+_collection_ensured: bool = False
 
 
 def get_client() -> QdrantClient:
     """Initializes and returns a singleton Qdrant client."""
-    global _client_instance
+    global _client_instance, _collection_ensured
     if _client_instance is not None:
+        if not _collection_ensured:
+            ensure_collection(_client_instance)
+            _collection_ensured = True
         return _client_instance
 
     # Option 1: Qdrant Cloud (preferred for prod if set)
@@ -48,6 +52,10 @@ def get_client() -> QdrantClient:
         qdrant_path = os.environ.get("QDRANT_PATH", "qdrant_db")
         logger.info(f"Initializing persistent local Qdrant client at: {qdrant_path}")
         _client_instance = QdrantClient(path=qdrant_path)
+
+    if not _collection_ensured:
+        ensure_collection(_client_instance)
+        _collection_ensured = True
 
     return _client_instance
 

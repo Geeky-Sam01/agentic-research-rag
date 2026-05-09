@@ -20,4 +20,4 @@ Write-Host "Docs: http://127.0.0.1:8000/docs"
 Write-Host ""
 
 
-uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+uv run uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload --reload-dir app

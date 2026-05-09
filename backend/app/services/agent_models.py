@@ -27,9 +27,9 @@ class Entities(BaseModel):
 
 class QueryPlan(BaseModel):
     """Structured output from the query rewriter."""
-    tasks: List[SubTask] = Field(description="Max 3 sub-tasks")
+    tasks: List[SubTask] = Field(default_factory=list, description="Max 3 sub-tasks")
     entities: Entities = Field(default_factory=Entities, description="Extracted named entities")
-    complexity: Literal["LOW", "MEDIUM", "HIGH"]
+    complexity: Literal["LOW", "MEDIUM", "HIGH"] = Field(default="LOW", description="Estimated query complexity")
     needs_clarification: bool = Field(default=False)
     clarification_question: Optional[str] = None
 

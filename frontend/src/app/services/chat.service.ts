@@ -28,10 +28,6 @@ export class ChatService {
   async streamChat(query: string) {
     this.closeStream();
 
-    if (!this.historyService.currentSessionId()) {
-      await this.historyService.createNewChat();
-    }
-
     const userMsg: Message = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -57,13 +53,14 @@ export class ChatService {
     this.statusHistory.set([initialStatus]);
     this.updateMessageStatus(assistantId, initialStatus);
 
-    // Build history: all settled messages before the current user turn
-    const settled = this.messages().slice(0, -1)  // exclude the new user msg just added
-      .filter((m: Message) => m.content && !m.isStreaming)
-      .map((m: Message) => ({ role: m.role, content: m.content }));
-    const historyParam = encodeURIComponent(JSON.stringify(settled));
+    // Use session ID for history, generate if new
+    let sessionId = this.historyService.currentSessionId();
+    if (!sessionId) {
+      sessionId = crypto.randomUUID();
+      this.historyService.currentSessionId.set(sessionId);
+    }
 
-    const url = `${this.BASE_URL}/api/chat/query-stream?query=${encodeURIComponent(query)}&history=${historyParam}`;
+    let url = `${this.BASE_URL}/api/chat/query-stream?query=${encodeURIComponent(query)}&session_id=${encodeURIComponent(sessionId)}`;
     this.eventSource = new EventSource(url);
 
     this.eventSource.onmessage = (event) => {
@@ -159,10 +156,6 @@ export class ChatService {
   async structuredChat(query: string) {
     this.closeStream();
 
-    if (!this.historyService.currentSessionId()) {
-      await this.historyService.createNewChat();
-    }
-
     const userMsg: Message = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -184,9 +177,16 @@ export class ChatService {
     this.loading.set(true);
     this.status.set('Structuring output...');
 
-    const payload = {
+    let sessionId = this.historyService.currentSessionId();
+    if (!sessionId) {
+      sessionId = crypto.randomUUID();
+      this.historyService.currentSessionId.set(sessionId);
+    }
+
+    const payload: any = {
       query: query,
-      stream: false
+      stream: false,
+      session_id: sessionId
     };
 
     this.http.post<any>(`${this.BASE_URL}/api/chat/query-structured`, payload).subscribe({
@@ -236,7 +236,8 @@ export class ChatService {
     this.messages.update((msgs: Message[]) => msgs.map((m: Message) =>
       m.id === assistantId ? { ...m, isStreaming: false } : m
     ));
-    this.historyService.updateCurrentSession(this.messages(), this.chunks());
+    // Refresh sessions to ensure backend-generated titles are synced
+    this.historyService.loadSessions();
   }
 
   private updateMessageStatus(id: string, status: string) {
