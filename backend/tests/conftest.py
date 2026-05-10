@@ -32,11 +32,16 @@ def mock_mf_instance(monkeypatch):
     mock_mf.get_open_ended_debt_scheme_performance.return_value = MOCK_DEBT_PERF
     mock_mf.get_open_ended_hybrid_scheme_performance.return_value = MOCK_HYBRID_PERF
     mock_mf.get_scheme_codes.return_value = MOCK_ALL_SCHEMES
-    mock_mf.calculate_returns.return_value = {
+    mock_mf.calculate_historical_sip_returns.return_value = {
         "total_invested": 120000.0,
         "current_value": 150000.0,
         "profit_loss": 30000.0,
         "returns_pct": 25.0
+    }
+    mock_mf.calculate_projected_sip_returns.return_value = {
+        "total_invested": 120000.0,
+        "projected_corpus": 150000.0,
+        "estimated_gains": 30000.0
     }
     
     monkeypatch.setattr(agent_tools, "mf", mock_mf)

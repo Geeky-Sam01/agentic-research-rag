@@ -109,7 +109,7 @@ def _fetch_performance_with_fallback(
     """Fetch AMFI performance data with date fallback and smart caching."""
     from datetime import datetime, timedelta
 
-    func_name = func.__name__
+    func_name = getattr(func, "__name__", "mock_func")
 
     # ── Case 1: Explicit date requested ──
     if report_date:
@@ -470,7 +470,7 @@ def search_scheme_by_name(keyword: str) -> dict:
 
         # 1. Smart Resolution (Handles Aliases and exact matches)
         res = resolve_fund(keyword)
-        if res.resolved and res.best_match:
+        if res.resolved and res.best_match and res.resolution_reason in ["alias_match", "exact_match"]:
             logger.info(f"Discovery Tool: smartly resolved '{keyword}' to '{res.best_match.scheme_name}'")
             return {str(res.best_match.scheme_code): res.best_match.scheme_name}
 
@@ -515,7 +515,7 @@ def calculate_historical_sip_returns(
     """
     logger.info(f"Calculating returns for code {scheme_code} over {investment_months} months")
 
-    if monthly_sip < 0 or investment_months < 1:
+    if monthly_sip < 0 or investment_months < 1 or (balance_units is not None and balance_units < 0):
         return {"error": "Invalid input values."}
 
     try:

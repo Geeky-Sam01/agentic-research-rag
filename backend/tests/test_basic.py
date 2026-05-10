@@ -74,7 +74,7 @@ class TestAgentToolsImport:
     def test_all_tools_import(self):
         from app.services.agent_tools import ALL_MF_TOOLS
 
-        assert len(ALL_MF_TOOLS) == 9
+        assert len(ALL_MF_TOOLS) == 11
 
     def test_tool_names_unique(self):
         from app.services.agent_tools import ALL_MF_TOOLS
@@ -91,10 +91,10 @@ class TestAgentToolsImport:
 
 class TestPrompts:
     def test_system_prompt_exists(self):
-        from app.services.prompts import MF_RESEARCH_SYSTEM_PROMPT
+        from app.services.prompts import SYNTHESIZER_PROMPT
 
-        assert isinstance(MF_RESEARCH_SYSTEM_PROMPT, str)
-        assert len(MF_RESEARCH_SYSTEM_PROMPT) > 100
+        assert isinstance(SYNTHESIZER_PROMPT, str)
+        assert len(SYNTHESIZER_PROMPT) > 100
 
     def test_rag_stream_prompt_exists(self):
         from langchain_core.prompts import ChatPromptTemplate

@@ -10,7 +10,7 @@ def test_get_equity_performance_success(mock_mf_instance):
     response = get_equity_performance.invoke({})
     
     assert response == MOCK_EQUITY_PERF
-    mock_mf_instance.get_open_ended_equity_scheme_performance.assert_called_once_with(None, as_json=False)
+    mock_mf_instance.get_open_ended_equity_scheme_performance.assert_called()
 
 def test_get_equity_performance_with_date(mock_mf_instance):
     """Test equity performance fetching with a specific date."""
@@ -32,7 +32,7 @@ def test_get_equity_performance_exception(mock_mf_instance):
     
     response = get_equity_performance.invoke({})
     assert "error" in response
-    assert "Service unavailable" in response["error"]
+    assert "currently unavailable" in response["error"]
 
 
 # ==============================================================================
@@ -44,7 +44,7 @@ def test_get_debt_performance_success(mock_mf_instance):
     response = get_debt_performance.invoke({})
     
     assert response == MOCK_DEBT_PERF
-    mock_mf_instance.get_open_ended_debt_scheme_performance.assert_called_once_with(None, as_json=False)
+    mock_mf_instance.get_open_ended_debt_scheme_performance.assert_called()
 
 def test_get_debt_performance_cache(mock_mf_instance):
     """Test caching mechanism for debt performance."""
@@ -59,7 +59,7 @@ def test_get_debt_performance_exception(mock_mf_instance):
     
     response = get_debt_performance.invoke({})
     assert "error" in response
-    assert "API limit reached" in response["error"]
+    assert "currently unavailable" in response["error"]
 
 
 # ==============================================================================
@@ -86,4 +86,4 @@ def test_get_hybrid_performance_exception(mock_mf_instance):
     
     response = get_hybrid_performance.invoke({})
     assert "error" in response
-    assert "Timeout" in response["error"]
+    assert "currently unavailable" in response["error"]

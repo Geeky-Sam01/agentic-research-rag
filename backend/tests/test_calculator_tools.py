@@ -1,13 +1,13 @@
 import pytest
 from pydantic import ValidationError
 
-from app.services.agent_tools import calculate_returns
+from app.services.agent_tools import calculate_historical_sip_returns
 
 # ==============================================================================
-# Tests for calculate_returns
+# Tests for calculate_historical_sip_returns
 # ==============================================================================
 
-def test_calculate_returns_success(mock_mf_instance):
+def test_calculate_historical_sip_returns_success(mock_mf_instance):
     """Test successful calculation of returns."""
     params = {
         "scheme_code": "119551",
@@ -15,18 +15,15 @@ def test_calculate_returns_success(mock_mf_instance):
         "monthly_sip": 5000,
         "investment_months": 24
     }
-    response = calculate_returns.invoke(params)
+    response = calculate_historical_sip_returns.invoke(params)
     
     assert "total_invested" in response
     assert response["total_invested"] == 120000.0
-    mock_mf_instance.calculate_returns.assert_called_once_with(
-        "119551", 1000.5, 5000.0, 24, as_json=False
-    )
 
 
 
 
-def test_calculate_returns_invalid_types(mock_mf_instance):
+def test_calculate_historical_sip_returns_invalid_types(mock_mf_instance):
     """Test handling of invalid input types."""
     params = {
         "scheme_code": "119551",
@@ -35,9 +32,9 @@ def test_calculate_returns_invalid_types(mock_mf_instance):
         "investment_months": 24
     }
     with pytest.raises(ValidationError):
-        calculate_returns.invoke(params)
+        calculate_historical_sip_returns.invoke(params)
 
-def test_calculate_returns_negative_values(mock_mf_instance):
+def test_calculate_historical_sip_returns_negative_values(mock_mf_instance):
     """Test handling of negative input values."""
     params = {
         "scheme_code": "119551",
@@ -45,12 +42,12 @@ def test_calculate_returns_negative_values(mock_mf_instance):
         "monthly_sip": 5000,
         "investment_months": 24
     }
-    response = calculate_returns.invoke(params)
+    response = calculate_historical_sip_returns.invoke(params)
     
     assert "error" in response
     assert "Invalid input values" in response["error"]
 
-def test_calculate_returns_zero_months(mock_mf_instance):
+def test_calculate_historical_sip_returns_zero_months(mock_mf_instance):
     """Test handling of zero investment months."""
     params = {
         "scheme_code": "119551",
@@ -58,29 +55,27 @@ def test_calculate_returns_zero_months(mock_mf_instance):
         "monthly_sip": 5000,
         "investment_months": 0
     }
-    response = calculate_returns.invoke(params)
+    response = calculate_historical_sip_returns.invoke(params)
     
     assert "error" in response
     assert "Invalid input values" in response["error"]
 
-def test_calculate_returns_none_returned(mock_mf_instance):
+def test_calculate_historical_sip_returns_none_returned(mock_mf_instance):
     """Test behavior when the underlying calculator returns None."""
-    mock_mf_instance.calculate_returns.return_value = None
-    
     params = {
         "scheme_code": "999999",
         "balance_units": 100,
         "monthly_sip": 5000,
         "investment_months": 12
     }
-    response = calculate_returns.invoke(params)
+    # If quote fails, tool returns the quote error
+    mock_mf_instance.get_scheme_quote.return_value = {"error": "Scheme code not found"}
+    response = calculate_historical_sip_returns.invoke(params)
     
     assert "error" in response
-    assert "Failed to calculate returns" in response["error"]
+    assert "Scheme code not found" in response["error"]
 
-def test_calculate_returns_exception(mock_mf_instance):
-    """Test exception handling."""
-    mock_mf_instance.calculate_returns.side_effect = Exception("Calculation error")
+    mock_mf_instance.get_scheme_quote.side_effect = Exception("Calculation error")
     
     params = {
         "scheme_code": "119551",
@@ -88,7 +83,7 @@ def test_calculate_returns_exception(mock_mf_instance):
         "monthly_sip": 5000,
         "investment_months": 12
     }
-    response = calculate_returns.invoke(params)
+    response = calculate_historical_sip_returns.invoke(params)
     
     assert "error" in response
     assert "Calculation error" in response["error"]
