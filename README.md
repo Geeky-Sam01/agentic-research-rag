@@ -19,31 +19,32 @@
 
 | Feature | Description |
 | :--- | :--- |
-| **🧠 Autonomous Reasoning** | Uses LangGraph ReAct agents to decide between document search, live market data lookups, or historical performance analysis. |
+| **🧠 Multi-Step Planner** | Decomposes complex financial queries into up to 5 strategic sub-tasks for exhaustive research. |
+| **🔄 Operation-Centric** | Advanced ReAct orchestration that maintains a shared context layer for cross-tool entity resolution. |
+| **📈 SIP Simulation Engine** | Robust backtesting tool for historical SIP returns and CAGR-based future projections with yearly top-ups. |
 | **📑 3-Layer PDF Engine** | High-fidelity extraction using `pdfplumber`, `PyMuPDF`, and `Tesseract OCR` fallback for scanned financial reports. |
-| **📉 Mutual Fund Intelligence** | Dedicated tool registry for live NAV quotes, historical performance tracking, and scheme discovery via AMFI. |
+| **📉 Mutual Fund Intelligence** | Live NAV quotes and historical performance tracking with a 5-day automated fallback mechanism. |
 | **⚡ Real-Time Thought Trace** | Transparent research logs showing tool calls and retrieval steps in a collapsible, persistent UI accordion. |
 | **🔗 Deep Source Attribution** | Instant verification with an evidence panel that highlights and previews the exact source chunks used. |
-| **💾 Multi-Session Memory** | Complete conversation and document state persistence across refreshes using IndexedDB and Qdrant. |
 
 ---
 
 ## 📊 System Architecture
 
-### 🔄 Agentic Inference Loop
-Determines the most accurate path to satisfy a financial query.
+### 🔄 Operation-Centric Reasoning Loop
+Determines the most accurate path by decomposing complex queries into actionable operations.
 
 ```mermaid
 graph TD
-    A[User Query] --> B{Agent Router}
-    B -- Needs Docs --> C[Vector Search]
-    B -- Needs Live Data --> D[NAV/Market Tools]
-    B -- Needs History --> E[AMFI Data Tool]
-    C --> F[Context Synthesis]
-    D --> F
-    E --> F
-    F --> G[LLM Response]
-    G --> H[Final UI Update]
+    A[User Query] --> B[Query Rewriter/Planner]
+    B --> C{Sub-task Manager}
+    C -- Operation 1 --> D[Performance Specialist]
+    C -- Operation 2 --> E[Calculator Specialist]
+    C -- Operation 3 --> F[RAG Specialist]
+    D & E & F --> G[Shared Context Layer]
+    G --> C
+    C -- All Tasks Done --> H[Response Synthesizer]
+    H --> I[Final Answer with Citations]
 ```
 
 ### 📥 Optimized Ingestion Pipeline
@@ -89,7 +90,7 @@ Command center for document management, indexing status, and automated discovery
 
 ### Backend Powerhouse
 - **FastAPI**: High-performance asynchronous API framework.
-- **LangGraph & LangChain**: Orchestration engine for agentic reasoning and tool binding.
+- **LangGraph & LangChain**: Orchestration engine for operation-centric reasoning and multi-step tool execution.
 - **Qdrant**: High-performance vector database running in local storage mode.
 - **Sentence Transformers**: Local embedding generation (`all-MiniLM-L6-v2`).
 
