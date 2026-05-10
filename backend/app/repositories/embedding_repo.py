@@ -1,10 +1,12 @@
-from typing import List
 import uuid
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List
+
 from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 
 from app.db.models import ChatMessage
-from sqlalchemy.future import select
+
 
 class EmbeddingRepository:
     def __init__(self, db: AsyncSession):

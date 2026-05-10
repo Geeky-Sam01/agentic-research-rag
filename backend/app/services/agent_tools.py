@@ -3,15 +3,14 @@ from datetime import datetime
 from typing import Optional
 
 from cachetools import TTLCache
+from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
-from langchain_core.tools import tool
-
+from app.services.dateHelper import prev_trading_day
 from app.services.embeddings import model as _embedder
 from app.services.mf_instance import mf
 from app.services.qdrant_service import get_client
 from app.services.rag_pipeline import get_rag_context
-from app.services.dateHelper import is_trading_day, prev_trading_day
 
 logger = logging.getLogger(__name__)
 
@@ -551,7 +550,7 @@ def calculate_historical_sip_returns(
                     if nav_val > 0:
                         simulated_units += monthly_sip / nav_val
                         total_invested += monthly_sip
-                except:
+                except Exception:
                     continue
 
             balance_units = simulated_units

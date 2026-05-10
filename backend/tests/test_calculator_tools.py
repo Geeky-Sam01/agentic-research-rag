@@ -1,4 +1,6 @@
 import pytest
+from pydantic import ValidationError
+
 from app.services.agent_tools import calculate_returns
 
 # ==============================================================================
@@ -21,7 +23,8 @@ def test_calculate_returns_success(mock_mf_instance):
         "119551", 1000.5, 5000.0, 24, as_json=False
     )
 
-from pydantic import ValidationError
+
+
 
 def test_calculate_returns_invalid_types(mock_mf_instance):
     """Test handling of invalid input types."""

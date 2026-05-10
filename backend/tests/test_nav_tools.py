@@ -1,6 +1,8 @@
 import pytest
-from app.services.agent_tools import get_scheme_quote, get_historical_nav
-from tests.fixtures.mock_nav_data import MOCK_SCHEME_QUOTE, MOCK_HISTORICAL_NAV
+from pydantic import ValidationError
+
+from app.services.agent_tools import get_historical_nav, get_scheme_quote
+from tests.fixtures.mock_nav_data import MOCK_HISTORICAL_NAV, MOCK_SCHEME_QUOTE
 
 # ==============================================================================
 # Tests for get_scheme_quote
@@ -40,7 +42,8 @@ def test_get_scheme_quote_exception(mock_mf_instance):
     assert "error" in response
     assert "Network timeout" in response["error"]
 
-from pydantic import ValidationError
+
+
 
 @pytest.mark.parametrize("invalid_input", [
     None, 12345, [], {}

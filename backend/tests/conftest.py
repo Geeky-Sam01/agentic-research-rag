@@ -1,12 +1,13 @@
+from unittest.mock import Mock
+
 import pytest
-from unittest.mock import Mock, patch
+
+import app.services.agent_tools as agent_tools
 
 # Clear caches for isolation
 from app.services.agent_tools import cache
-import app.services.agent_tools as agent_tools
-
-from tests.fixtures.mock_nav_data import MOCK_SCHEME_QUOTE, MOCK_HISTORICAL_NAV
-from tests.fixtures.mock_performance_data import MOCK_EQUITY_PERF, MOCK_DEBT_PERF, MOCK_HYBRID_PERF
+from tests.fixtures.mock_nav_data import MOCK_HISTORICAL_NAV, MOCK_SCHEME_QUOTE
+from tests.fixtures.mock_performance_data import MOCK_DEBT_PERF, MOCK_EQUITY_PERF, MOCK_HYBRID_PERF
 from tests.fixtures.mock_rag_data import MOCK_RAG_RESPONSE
 from tests.fixtures.mock_scheme_data import MOCK_ALL_SCHEMES
 

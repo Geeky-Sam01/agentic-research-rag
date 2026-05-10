@@ -1,4 +1,3 @@
-import os
 
 with open('app/services/agent_tools.py', 'r') as f:
     content = f.read()

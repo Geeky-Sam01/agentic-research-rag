@@ -1,12 +1,13 @@
-from typing import List, Optional
 import uuid
+from typing import List, Optional
+
+from sqlalchemy import delete
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import delete
 
 from app.db.models import ChatSession
 
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 class SessionRepository:
     def __init__(self, db: AsyncSession):

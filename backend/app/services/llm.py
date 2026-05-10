@@ -1,15 +1,14 @@
 import logging
 from typing import AsyncGenerator, Optional
 
+from langchain_openai import ChatOpenAI
+
 from app.core.config import settings
 from app.core.llm_clients import get_llm_with_fallbacks
 from app.models.schemas import FinSightResponse
 from app.services.prompts import RAG_STREAM_PROMPT, RAG_STRUCTURED_PROMPT
 
 logger = logging.getLogger(__name__)
-
-
-from langchain_openai import ChatOpenAI
 
 _llm_instance = None
 _planner_llm_instance = None

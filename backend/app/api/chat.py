@@ -3,19 +3,18 @@ import logging
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query, BackgroundTasks, Depends  # type: ignore
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query  # type: ignore
 from fastapi.responses import JSONResponse, StreamingResponse  # type: ignore
 from langchain_core.messages import AIMessage, HumanMessage
-
-from app.models.schemas import QueryRequest
-from app.services.ingest_pipeline import get_client
-from app.services.langchain_agents import run_agent_query, stream_agent_query
-from app.services.llm import generate_answer_structured  # type: ignore
-from app.services.history_service import HistoryService
-from app.db.connection import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+
+from app.db.connection import get_db
 from app.db.models import ChatSession
+from app.models.schemas import QueryRequest
+from app.services.history_service import HistoryService
+from app.services.langchain_agents import run_agent_query, stream_agent_query
+from app.services.llm import generate_answer_structured  # type: ignore
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -34,12 +33,12 @@ def _infer_last_response_mode(chat_history: list) -> Optional[str]:
     for msg in reversed(chat_history):
         if isinstance(msg, AIMessage) and msg.content:
             text = msg.content.strip()
-            lines = [l for l in text.splitlines() if l.strip()]
+            lines = [line for line in text.splitlines() if line.strip()]
             # Concise: short deterministic format (NAV card = <=5 lines)
             if len(lines) <= 5:
                 return "concise"
             # Analytical: structured bullet/table output
-            if any(l.lstrip().startswith(("- ", "* ", "|", "#")) for l in lines):
+            if any(line.lstrip().startswith(("- ", "* ", "|", "#")) for line in lines):
                 return "analytical"
             return "detailed"
     return None

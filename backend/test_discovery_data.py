@@ -1,5 +1,6 @@
 import asyncio
 import logging
+
 from app.services.langchain_agents import run_agent_query
 
 logging.basicConfig(level=logging.INFO)

@@ -1,5 +1,7 @@
 import asyncio
+import sys
 from logging.config import fileConfig
+from pathlib import Path
 
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
@@ -16,14 +18,13 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-import sys
-from pathlib import Path
+
 
 # Add backend dir to path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from app.db.models import Base
-from app.db.connection import DATABASE_URL
+from app.db.connection import DATABASE_URL  # noqa: E402
+from app.db.models import Base  # noqa: E402
 
 target_metadata = Base.metadata
 

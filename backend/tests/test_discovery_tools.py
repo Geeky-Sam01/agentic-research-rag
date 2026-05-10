@@ -1,5 +1,4 @@
-import pytest
-from app.services.agent_tools import search_schemes, search_scheme_by_name
+from app.services.agent_tools import search_scheme_by_name, search_schemes
 
 # ==============================================================================
 # Tests for search_schemes

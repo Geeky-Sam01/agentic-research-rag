@@ -17,21 +17,26 @@ import json
 import logging
 import re
 import time
-from enum import Enum
-from typing import Annotated, AsyncGenerator, List, Literal, Optional
+from typing import Annotated, AsyncGenerator, List, Optional
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
-from langchain_openai import ChatOpenAI
-from langgraph.graph import END, START, StateGraph
-from langgraph.prebuilt import create_react_agent
-from pydantic import BaseModel, Field
-from typing_extensions import TypedDict
-from langgraph.graph.message import add_messages
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
+from langgraph.prebuilt import create_react_agent
 from psycopg_pool import AsyncConnectionPool
+from typing_extensions import TypedDict
 
-from app.core.config import settings
+from app.services.agent_models import (
+    AgentResult,
+    Intent,
+    IntentCheckResult,
+    Operation,
+    QueryPlan,
+    SubTask,
+    _IntentClass,
+)
 from app.services.agent_tools import (
     CALCULATOR_TOOLS,
     DATA_TOOLS,
@@ -39,6 +44,9 @@ from app.services.agent_tools import (
     DOCUMENT_TOOLS,
     PERFORMANCE_TOOLS,
 )
+from app.services.capabilities import detect_requested_capability
+from app.services.fund_resolver import resolve_fund
+from app.services.llm import get_llm, get_planner_llm
 from app.services.prompts import (
     CALCULATOR_AGENT_PROMPT,
     DATA_AGENT_PROMPT,
@@ -49,9 +57,7 @@ from app.services.prompts import (
     QUERY_REWRITER_PROMPT,
     SYNTHESIZER_PROMPT,
 )
-from app.services.router import route_message, stream_no_tool_response, RouteContext
-from app.services.fund_resolver import resolve_fund
-from app.services.capabilities import detect_requested_capability
+from app.services.router import RouteContext, route_message, stream_no_tool_response
 
 try:
     from langfuse.callback import CallbackHandler as LangfuseHandler
@@ -59,6 +65,8 @@ try:
     _langfuse_available = True
 except ImportError:
     _langfuse_available = False
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +76,6 @@ logger = logging.getLogger(__name__)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from app.services.agent_models import Intent, SubTask, Entities, QueryPlan, AgentResult, IntentCheckResult, _IntentClass, Operation
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -103,7 +110,6 @@ class PipelineState(TypedDict):
 # 3. SINGLETON LLMs
 # ══════════════════════════════════════════════════════════════════════════════
 
-from app.services.llm import get_llm, get_planner_llm
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1014,7 +1020,6 @@ def _has_category(q: str) -> bool:
     return any(c in ql for c in CATEGORIES)
 
 
-import re
 
 
 def _extract_features(q: str) -> dict:
@@ -1098,7 +1103,7 @@ async def intent_check_node(state: PipelineState, config: RunnableConfig) -> dic
 
     # ── Safety net: GENERAL intent bypasses full orchestration ──
     if intent == "GENERAL":
-        logger.info(f"IntentCheck: GENERAL intent — injecting direct plan (safety net)")
+        logger.info("IntentCheck: GENERAL intent — injecting direct plan (safety net)")
         return {
             "intent_check": {
                 "intent": "GENERAL",

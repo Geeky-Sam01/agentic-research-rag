@@ -1,9 +1,11 @@
-from typing import List, Optional
 import uuid
+from typing import List, Optional
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from app.db.models import ChatMessage, ChatSession
+from app.db.models import ChatMessage
+
 
 class MessageRepository:
     def __init__(self, db: AsyncSession):

@@ -1,13 +1,9 @@
-import asyncio
 import logging
-from typing import List, Optional, Tuple
 import uuid
+from typing import List, Optional
 
 from app.db.connection import AsyncSessionFactory
 from app.repositories.session_repo import SessionRepository
-from app.repositories.message_repo import MessageRepository
-from app.repositories.embedding_repo import EmbeddingRepository
-from app.services.embeddings import get_embedding
 
 logger = logging.getLogger(__name__)
 
@@ -54,10 +50,11 @@ class HistoryService:
             await db.commit()
 
     async def get_graph_messages(self, session_id: str) -> List[dict]:
-        from app.services.langchain_agents import get_pipeline
-        from langchain_core.messages import AIMessage, HumanMessage
-        import uuid
         from datetime import datetime
+
+        from langchain_core.messages import AIMessage, HumanMessage
+
+        from app.services.langchain_agents import get_pipeline
 
         graph = get_pipeline()
         config = {"configurable": {"thread_id": session_id}}

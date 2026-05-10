@@ -1,6 +1,7 @@
 import pytest
+
 from app.services.agent_tools import read_factsheet
-from tests.fixtures.mock_rag_data import MOCK_RAG_RESPONSE, MOCK_RAG_EMPTY_RESPONSE
+from tests.fixtures.mock_rag_data import MOCK_RAG_EMPTY_RESPONSE, MOCK_RAG_RESPONSE
 
 # ==============================================================================
 # Tests for read_factsheet

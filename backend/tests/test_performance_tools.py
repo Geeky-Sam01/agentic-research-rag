@@ -1,6 +1,5 @@
-import pytest
-from app.services.agent_tools import get_equity_performance, get_debt_performance, get_hybrid_performance
-from tests.fixtures.mock_performance_data import MOCK_EQUITY_PERF, MOCK_DEBT_PERF, MOCK_HYBRID_PERF
+from app.services.agent_tools import get_debt_performance, get_equity_performance, get_hybrid_performance
+from tests.fixtures.mock_performance_data import MOCK_DEBT_PERF, MOCK_EQUITY_PERF, MOCK_HYBRID_PERF
 
 # ==============================================================================
 # Tests for get_equity_performance

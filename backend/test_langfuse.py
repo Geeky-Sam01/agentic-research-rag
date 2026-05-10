@@ -1,13 +1,14 @@
-import os
 from dotenv import load_dotenv
 
 # Load env before importing anything else
 load_dotenv()
 
-from langchain_core.messages import HumanMessage
-from langfuse.callback import CallbackHandler
-from app.core.config import settings
-from app.core.llm_clients import get_llm_with_fallbacks
+from langchain_core.messages import HumanMessage  # noqa: E402
+from langfuse.callback import CallbackHandler  # noqa: E402
+
+from app.core.config import settings  # noqa: E402
+from app.core.llm_clients import get_llm_with_fallbacks  # noqa: E402
+
 
 def test_langfuse_tracing():
     print("Initializing Langfuse Callback Handler...")

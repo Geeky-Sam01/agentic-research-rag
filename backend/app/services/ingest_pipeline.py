@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import pdfplumber
-
 from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct
 
