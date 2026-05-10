@@ -53,7 +53,7 @@ async def get_sessions():
 @router.get("/sessions/{session_id}/messages")
 async def get_session_messages(session_id: str):
     """Get full message history for a session."""
-    messages = await _history_service.get_messages(session_id)
+    messages = await _history_service.get_graph_messages(session_id)
     return JSONResponse(content={"messages": messages})
 
 @router.delete("/sessions/{session_id}")
@@ -85,10 +85,10 @@ async def query_stream(
     if not query or not query.strip():
         raise HTTPException(status_code=400, detail="Query is required")
 
-    # Load history from DB if session exists, else create
+    # Retrieve chat history from LangGraph purely for response mode inference
     chat_history = []
     if session_id:
-        db_messages = await _history_service.get_messages(session_id)
+        db_messages = await _history_service.get_graph_messages(session_id)
         for msg in db_messages:
             if msg["role"] == "user":
                 chat_history.append(HumanMessage(content=msg["content"]))
@@ -96,11 +96,10 @@ async def query_stream(
                 chat_history.append(AIMessage(content=msg["content"]))
     else:
         session_id = str(uuid.uuid4())
-        
-    session_id = await _history_service.create_session(session_id=session_id, title=query)
-        
-    # Save the new user message
-    user_msg_id = await _history_service.add_message(session_id, "user", query)
+        await _history_service.create_session(session_id=session_id, title=query)
+    
+    # Update title immediately
+    await _history_service.update_session_title(session_id, query)
 
     logger.info(f"Agentic Stream Query: \"{query}\" (history: {len(chat_history)} msgs)")
 
@@ -112,7 +111,6 @@ async def query_stream(
             accumulated_sources = []
             async for event in stream_agent_query(
                 query,
-                chat_history=chat_history or None,
                 last_response_mode=last_response_mode,
                 session_id=session_id,
             ):
@@ -169,7 +167,6 @@ async def query_stream(
         try:
             async for event in stream_agent_query(
                 query,
-                chat_history=chat_history or None,
                 last_response_mode=last_response_mode,
                 session_id=session_id,
             ):
@@ -195,36 +192,14 @@ async def query_stream(
                 yield f"data: {json.dumps({'type': 'sources', 'sources': accumulated_sources})}\n\n"
             yield f"data: {json.dumps({'content': '[DONE]'})}\n\n"
             
-            # Use background tasks for persistence to avoid CancelledError on client disconnect
-            background_tasks.add_task(
-                _finalize_session, 
-                session_id, 
-                user_msg_id, 
-                query, 
-                full_content, 
-                accumulated_sources
-            )
+            # Stream is fully done, LangGraph already saved the state natively!
+            pass
 
         except Exception as e:
             logger.error(f"Stream error: {e}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
 
     return StreamingResponse(wrapped_event_generator(), media_type="text/event-stream")
-
-
-async def _finalize_session(session_id: str, user_msg_id: str, query: str, full_content: str, sources: list):
-    """Helper to save messages and trigger embeddings in the background."""
-    try:
-        ai_msg_id = await _history_service.add_message(
-            session_id, 
-            "assistant", 
-            full_content, 
-            {"sources": sources}
-        )
-        _history_service.trigger_embedding_task(session_id, user_msg_id, query, ai_msg_id, full_content)
-        logger.info(f"Background: Finalized session {session_id}")
-    except Exception as e:
-        logger.error(f"Background: Failed to finalize session: {e}")
 
 
 @router.post("/query-structured")
@@ -240,10 +215,10 @@ async def query_structured(request: QueryRequest):
     try:
         session_id = request.session_id if hasattr(request, 'session_id') else None
         
-        # Load history from DB
+        # Load history from DB purely for context mode
         chat_history = []
         if session_id:
-            db_messages = await _history_service.get_messages(session_id)
+            db_messages = await _history_service.get_graph_messages(session_id)
             for msg in db_messages:
                 if msg["role"] == "user":
                     chat_history.append(HumanMessage(content=msg["content"]))
@@ -251,10 +226,9 @@ async def query_structured(request: QueryRequest):
                     chat_history.append(AIMessage(content=msg["content"]))
         else:
             session_id = str(uuid.uuid4())
-            
-        session_id = await _history_service.create_session(session_id=session_id, title=request.query)
+            await _history_service.create_session(session_id=session_id, title=request.query)
 
-        user_msg_id = await _history_service.add_message(session_id, "user", request.query)
+        await _history_service.update_session_title(session_id, request.query)
     except Exception as e:
         import traceback
         with open("error.log", "w") as f:
@@ -266,14 +240,9 @@ async def query_structured(request: QueryRequest):
         last_response_mode = _infer_last_response_mode(chat_history)
         agent_res = await run_agent_query(
             request.query,
-            chat_history=chat_history,
             last_response_mode=last_response_mode,
             session_id=session_id,
         )
-        
-        # Save raw output AI message
-        ai_msg_id = await _history_service.add_message(session_id, "assistant", agent_res["output"], {"sources": agent_res["sources"]})
-        _history_service.trigger_embedding_task(session_id, user_msg_id, request.query, ai_msg_id, agent_res["output"])
         
         # Step 2: Use the structured parser to transform raw analysis into UI-friendly blocks
         # We pass the agent's output as 'context' to the formatting chain

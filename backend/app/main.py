@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Context manager for startup and shutdown tasks."""
     logger.info("Starting up Agentic Research RAG API...")
+    from app.services.langchain_agents import setup_checkpointer
+    await setup_checkpointer()
+    logger.info("LangGraph checkpointer initialized.")
     init_ocr()
     yield
     logger.info("Shutting down Agentic Research RAG API...")

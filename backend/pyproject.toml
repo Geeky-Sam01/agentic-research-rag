@@ -66,6 +66,9 @@ dependencies = [
     "asyncpg>=0.31.0",
     "pgvector>=0.4.2",
     "alembic>=1.18.4",
+    "langgraph-checkpoint-postgres>=3.0.5",
+    "psycopg-pool>=3.3.1",
+    "psycopg[binary]>=3.3.4",
 ]
 
 [dependency-groups]

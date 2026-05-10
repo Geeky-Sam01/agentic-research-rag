@@ -1,16 +1,16 @@
-import sys
 import os
+import sys
 import json
-import traceback
-from pathlib import Path
+import asyncio
+from datetime import datetime
 
-# Add backend directory to Python path so we can import app modules
-backend_dir = Path(__file__).resolve().parent.parent
-sys.path.append(str(backend_dir))
+# Add the backend directory to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.services.agent_tools import (
     get_scheme_quote,
     get_historical_nav,
+    get_scheme_details,
     get_equity_performance,
     get_debt_performance,
     get_hybrid_performance,
@@ -20,74 +20,87 @@ from app.services.agent_tools import (
     read_factsheet
 )
 
-def format_data(data):
-    """Safely format data for printing, truncating if too long."""
-    try:
-        data_str = json.dumps(data, indent=2, default=str)
-    except Exception:
-        data_str = str(data)
-        
-    if len(data_str) > 1500:
-        return data_str[:1500] + f"\n... [Truncated {len(data_str) - 1500} more characters]"
-    return data_str
+OUTPUT_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "artifacts", "tool_test_results.md"))
 
-def run_test(tool, kwargs):
-    print(f"\n{'='*30} Testing: {tool.name} {'='*30}")
-    print(f"📥 INPUTS:")
-    print(format_data(kwargs))
-    print("-" * 75)
-    
+# Sample inputs
+SAMPLE_SCHEME_CODE = "119551"  # SBI Bluechip Fund - Direct - Growth
+SAMPLE_AMC = "HDFC"
+SAMPLE_KEYWORD = "midcap"
+SAMPLE_FACTSHEET_QUERY = "What are the top holdings of HDFC Top 100 fund?"
+
+async def test_tool(tool_func, **kwargs):
+    print(f"Testing {tool_func.name}...")
     try:
-        result = tool.invoke(kwargs)
-        
-        if isinstance(result, dict) and "error" in result:
-            print(f"❌ RESULT: ERROR")
-            print(f"Error Message: {result['error']}")
-        else:
-            print(f"✅ RESULT: SUCCESS")
-            print(f"Output Type: {type(result).__name__}")
-            print(f"📤 OUTPUT:")
-            print(format_data(result))
+        # tool_func is a LangChain tool, call .invoke()
+        result = tool_func.invoke(kwargs)
+        return {
+            "name": tool_func.name,
+            "inputs": kwargs,
+            "output": result
+        }
     except Exception as e:
-        print(f"💥 FATAL EXCEPTION")
-        traceback.print_exc()
-        
-    print("=" * 75)
+        return {
+            "name": tool_func.name,
+            "inputs": kwargs,
+            "error": str(e)
+        }
 
-def main():
-    print("🚀 Starting Agent Tools Test Suite...")
+async def run_tests():
+    os.makedirs(os.path.dirname(OUTPUT_FILE), exist_ok=True)
     
-    # Example constants
-    test_scheme_code = "119551"
-    test_amc = "SBI"
-    test_keyword = "bluechip"
+    results = []
     
-    # ============== 1. DATA TOOLS ==============
-    run_test(get_scheme_quote, {"scheme_code": test_scheme_code})
-    run_test(get_historical_nav, {"scheme_code": test_scheme_code})
+    # 1. DATA TOOLS
+    results.append(await test_tool(get_scheme_quote, scheme_code=SAMPLE_SCHEME_CODE))
+    results.append(await test_tool(get_historical_nav, scheme_code=SAMPLE_SCHEME_CODE))
+    results.append(await test_tool(get_scheme_details, scheme_code=SAMPLE_SCHEME_CODE))
     
-    # ============== 2. PERFORMANCE TOOLS ==============
-    # Testing with a specific historical date because 'latest' might be failing 
-    # if today is a weekend/holiday or if AMFI data is delayed.
-    test_date = "01-Mar-2024"
-    run_test(get_equity_performance, {"report_date": test_date})
-    run_test(get_debt_performance, {"report_date": test_date})
-    run_test(get_hybrid_performance, {"report_date": test_date})
+    # 2. PERFORMANCE TOOLS
+    results.append(await test_tool(get_equity_performance))
+    results.append(await test_tool(get_debt_performance))
+    results.append(await test_tool(get_hybrid_performance))
     
-    # ============== 3. DISCOVERY TOOLS ==============
-    run_test(search_schemes, {"amc_name": test_amc})
-    run_test(search_scheme_by_name, {"keyword": test_keyword})
+    # 3. DISCOVERY TOOLS
+    results.append(await test_tool(search_schemes, amc_name=SAMPLE_AMC))
+    results.append(await test_tool(search_scheme_by_name, keyword=SAMPLE_KEYWORD))
     
-    # ============== 4. CALCULATOR TOOLS ==============
-    run_test(calculate_returns, {
-        "scheme_code": test_scheme_code,
-        "balance_units": 100.0,
-        "monthly_sip": 5000.0,
-        "investment_months": 12
-    })
+    # 4. CALCULATOR TOOLS
+    results.append(await test_tool(calculate_returns, 
+                                  scheme_code=SAMPLE_SCHEME_CODE, 
+                                  balance_units=100.5, 
+                                  monthly_sip=5000.0, 
+                                  investment_months=36))
     
-    # ============== 5. DOCUMENT TOOLS ==============
-    run_test(read_factsheet, {"query": "What are the top 10 stock holdings?"})
+    # 5. DOCUMENT TOOLS
+    results.append(await test_tool(read_factsheet, query=SAMPLE_FACTSHEET_QUERY))
+
+    # Generate Markdown Report
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        f.write("# Agent Tool Test Results\n")
+        f.write(f"Generated at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        
+        for res in results:
+            f.write(f"## Tool: `{res['name']}`\n")
+            f.write("### Inputs\n")
+            f.write("```json\n")
+            f.write(json.dumps(res['inputs'], indent=2))
+            f.write("\n```\n")
+            
+            f.write("### Output\n")
+            if "error" in res:
+                f.write(f"**Error**: {res['error']}\n")
+            else:
+                f.write("```json\n")
+                # Truncate very long outputs (like historical NAV or many schemes)
+                output_str = json.dumps(res['output'], indent=2)
+                if len(output_str) > 2000:
+                    f.write(output_str[:2000] + "\n... [TRUNCATED] ...")
+                else:
+                    f.write(output_str)
+                f.write("\n```\n")
+            f.write("\n---\n\n")
+            
+    print(f"Results written to {OUTPUT_FILE}")
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(run_tests())

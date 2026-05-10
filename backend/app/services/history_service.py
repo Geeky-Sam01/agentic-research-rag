@@ -53,78 +53,51 @@ class HistoryService:
             await repo.delete(session_id)
             await db.commit()
 
-    async def get_messages(self, session_id: str) -> List[dict]:
-        async with AsyncSessionFactory() as db:
-            repo = MessageRepository(db)
-            messages = await repo.get_by_session(session_id)
-            return [
-                {
-                    "id": str(m[0]),
-                    "role": m[1],
-                    "content": m[2],
-                    "metadata": m[3],
-                    "created_at": m[4].isoformat()
-                }
-                for m in messages
-            ]
+    async def get_graph_messages(self, session_id: str) -> List[dict]:
+        from app.services.langchain_agents import get_pipeline
+        from langchain_core.messages import AIMessage, HumanMessage
+        import uuid
+        from datetime import datetime
 
-    async def add_message(
-        self, session_id: str, role: str, content: str, metadata: Optional[dict] = None
-    ) -> str:
-        async with AsyncSessionFactory() as db:
-            repo = MessageRepository(db)
-            msg = await repo.create(session_id, role, content, metadata)
-            
-            # If this is a user message and session title is "New Chat", update it
-            if role == 'user':
-                session_repo = SessionRepository(db)
-                session = await session_repo.get(session_id)
-                if session and session.title == "New Chat":
-                    session.title = content[:40] + ("..." if len(content) > 40 else "")
-            
-            await db.commit()
-            return str(msg.id)
-
-    async def _embed_messages(
-        self,
-        session_id: str,
-        human_msg_id: str,
-        human_content: str,
-        ai_msg_id: str,
-        ai_content: str,
-    ) -> None:
-        """Background task: embed and store both turns."""
+        graph = get_pipeline()
+        config = {"configurable": {"thread_id": session_id}}
         try:
-            # get_embedding is already async — call directly, no to_thread wrapper needed
-            human_emb, ai_emb = await asyncio.gather(
-                get_embedding(human_content),
-                get_embedding(ai_content),
-            )
+            state = await graph.aget_state(config)
+            if not state or not state.values:
+                return []
+            
+            messages = state.values.get("messages", [])
+            formatted = []
+            for m in messages:
+                # Skip SystemMessages and ToolMessages for UI
+                if not isinstance(m, (AIMessage, HumanMessage)):
+                    continue
+                
+                role = "assistant" if isinstance(m, AIMessage) else "user"
+                
+                # Check for sources if it's an AI message
+                sources = []
+                if isinstance(m, AIMessage):
+                    # We might have stored sources in a different way, but for now we just return empty list
+                    # if it's not present. The frontend expects them in metadata.sources
+                    sources = []
 
-            async with AsyncSessionFactory() as db:
-                emb_repo = EmbeddingRepository(db)
-                await emb_repo.upsert(human_msg_id, session_id, human_emb)
-                await emb_repo.upsert(ai_msg_id, session_id, ai_emb)
-                await db.commit()
-
+                formatted.append({
+                    "id": m.id or str(uuid.uuid4()),
+                    "role": role,
+                    "content": str(m.content) if m.content else "",
+                    "metadata": {"sources": sources},
+                    "created_at": datetime.utcnow().isoformat()
+                })
+            return formatted
         except Exception as e:
-            logger.error(f"Embedding background task failed: {e}", exc_info=True)
-
-    def trigger_embedding_task(
-        self,
-        session_id: str,
-        human_msg_id: str,
-        human_content: str,
-        ai_msg_id: str,
-        ai_content: str,
-    ):
-        """Helper to fire off the background task."""
-        asyncio.create_task(
-            self._embed_messages(
-                session_id=session_id,
-                human_msg_id=human_msg_id,
-                human_content=human_content,
-                ai_msg_id=ai_msg_id,
-                ai_content=ai_content,
-            )
-        )
+            logger.error(f"Failed to fetch graph messages: {e}", exc_info=True)
+            return []
+            
+    async def update_session_title(self, session_id: str, title: str) -> None:
+        async with AsyncSessionFactory() as db:
+            session_repo = SessionRepository(db)
+            session = await session_repo.get(session_id)
+            if session and session.title == "New Chat":
+                session.title = title[:40] + ("..." if len(title) > 40 else "")
+                await db.commit()

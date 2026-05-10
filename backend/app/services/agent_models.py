@@ -10,13 +10,19 @@ class Intent(str, Enum):
     CALCULATOR = "CALCULATOR"
     GENERAL = "GENERAL"
 
+class Operation(BaseModel):
+    type: str
+    confidence: float = 1.0
+    evidence: List[str] = Field(default_factory=list)
+
 class SubTask(BaseModel):
     """A single decomposed sub-task from the query rewriter."""
     id: str = Field(description="Unique task identifier, e.g. 'task_1'")
-    intent: Intent
+    intent: str  # Use str instead of Enum to avoid LangGraph deserialization warnings
     query: str = Field(description="Specific, actionable query for the agent")
     priority: int = Field(ge=1, le=3, description="1 = highest priority")
     requires: List[str] = Field(default_factory=list, description="IDs of tasks this depends on")
+    operations: List[Operation] = Field(default_factory=list, description="Extracted operations for this task")
 
 class Entities(BaseModel):
     """Named entities extracted from the user query."""

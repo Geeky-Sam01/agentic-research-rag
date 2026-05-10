@@ -5,8 +5,8 @@ Graph: START → Rewriter → Controller → Executor(loop) → Synthesizer → 
                 ↘ Clarify → END
 
 Features:
-  - Structured query decomposition (max 3 sub-tasks)
-  - Execution controller with guardrails (max 2 agents, max 1 DOCUMENT)
+  - Structured query decomposition (max 5 sub-tasks)
+  - Execution controller with guardrails (max 5 agents, max 1 DOCUMENT)
   - Shared context layer for cross-agent entity resolution
   - Structured agent outputs (AgentResult)
   - Synthesizer for multi-agent output fusion
@@ -16,6 +16,7 @@ Features:
 import json
 import logging
 import re
+import time
 from enum import Enum
 from typing import Annotated, AsyncGenerator, List, Literal, Optional
 
@@ -26,6 +27,9 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import create_react_agent
 from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
+from langgraph.graph.message import add_messages
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from psycopg_pool import AsyncConnectionPool
 
 from app.core.config import settings
 from app.services.agent_tools import (
@@ -45,7 +49,9 @@ from app.services.prompts import (
     QUERY_REWRITER_PROMPT,
     SYNTHESIZER_PROMPT,
 )
-from app.services.router import route_message, stream_no_tool_response
+from app.services.router import route_message, stream_no_tool_response, RouteContext
+from app.services.fund_resolver import resolve_fund
+from app.services.capabilities import detect_requested_capability
 
 try:
     from langfuse.callback import CallbackHandler as LangfuseHandler
@@ -62,7 +68,7 @@ logger = logging.getLogger(__name__)
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-from app.services.agent_models import Intent, SubTask, Entities, QueryPlan, AgentResult, IntentCheckResult, _IntentClass
+from app.services.agent_models import Intent, SubTask, Entities, QueryPlan, AgentResult, IntentCheckResult, _IntentClass, Operation
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -71,23 +77,26 @@ from app.services.agent_models import Intent, SubTask, Entities, QueryPlan, Agen
 
 
 def _append_results(existing: list, new: list) -> list:
-    """Reducer: accumulate agent results across executor iterations."""
+    """Reducer: accumulate agent results across executor iterations. Pass None to clear."""
+    if new is None:
+        return []
     return (existing or []) + (new or [])
 
 
 class PipelineState(TypedDict):
     """Full pipeline state for the agentic graph."""
 
-    messages: list[BaseMessage]
+    messages: Annotated[list[BaseMessage], add_messages]
     intent_check: Optional[dict]  # IntentCheckResult dict
     query_plan: Optional[dict]
-    shared_context: dict
+    shared_context: Annotated[dict, lambda x, y: {**x, **y}]
     pending_tasks: list[dict]
     current_task_index: int
     agent_results: Annotated[list[dict], _append_results]
     sources: list[dict]
     error: Optional[str]
     last_response_mode: Optional[str]  # "concise" | "analytical" | "detailed"
+    requested_capability: Optional[str] = None
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -128,8 +137,8 @@ def _get_agent(intent: str):
 
 # ── Ambiguity detection constants & requirements ────────────────────────────────────────────
 INTENT_REQUIREMENTS = {
-    "PERFORMANCE": ["category_or_fund", "horizon", "risk"],
-    "CALCULATOR": ["amount", "tenure"],
+    "PERFORMANCE": ["category_or_fund"],
+    "CALCULATOR": ["amount", "tenure", "return_rate"],
     "DATA": ["fund"],
     "DOCUMENT": ["fund"],
     "DISCOVERY": [],
@@ -152,6 +161,7 @@ FIELD_QUESTIONS = {
     },
     "amount": {"q": "What amount do you want to invest?", "examples": ["₹5000 per month", "₹1 lakh lump sum"]},
     "tenure": {"q": "For how long will you invest?", "examples": ["2 years", "5 years", "10 years"]},
+    "return_rate": {"q": "What is the expected annual return percentage?", "examples": ["12%", "15% annual return"]},
 }
 
 INTENT_PREFIX = {
@@ -173,13 +183,154 @@ DEFAULT_CLARIFICATION = (
 
 CATEGORIES = ["large cap", "mid cap", "small cap", "flexi cap", "debt", "hybrid"]
 
+# ── Operations Metadata (V3 Migration) ────────────────────────────────────────────────────────
+SUPPORTED_OPERATIONS = {
+    "fund_resolution",
+    "nav_lookup",
+    "historical_return_lookup",
+    "fund_category_lookup",
+    "sip_projection",
+    "historical_sip_simulation",
+    "factsheet_analysis",
+    "holdings_analysis",
+    "fund_comparison",
+    "fund_ranking",
+    "qualitative_risk_analysis",
+}
+
+OPERATION_TOOL_MAP = {
+    "nav_lookup": ["get_scheme_quote"],
+    "historical_return_lookup": ["get_historical_nav"],
+    "sip_projection": ["calculate_projected_sip_returns"],
+    "historical_sip_simulation": ["calculate_historical_sip_returns"],
+    "factsheet_analysis": ["read_factsheet"],
+    "fund_resolution": ["resolve_fund"],
+}
+
+OPERATION_PRIORITY = [
+    "fund_resolution",
+    "nav_lookup",
+    "historical_return_lookup",
+    "sip_projection",
+    "factsheet_analysis",
+    "fund_comparison",
+]
+
+def extract_operations(query: str, features: dict) -> list[dict]:
+    ops = []
+    ql = query.lower()
+
+    def add_op(op_type: str, confidence: float, evidence: list[str]):
+        ops.append({
+            "type": op_type,
+            "confidence": confidence,
+            "evidence": evidence,
+        })
+
+    # ─────────────────────────────
+    # Fund Resolution
+    # ─────────────────────────────
+    fund_evidence = []
+
+    if features.get("has_fund"):
+        fund_evidence.append("has_fund_feature")
+
+    if any(k in ql for k in [
+        "sbi", "icici", "hdfc", "axis",
+        "ppfas", "parag", "quant",
+        "nippon", "motilal", "tata", "dsp"
+    ]):
+        fund_evidence.append("fund_keyword")
+
+    if fund_evidence:
+        add_op(
+            "fund_resolution",
+            0.95,
+            fund_evidence
+        )
+
+    # ─────────────────────────────
+    # SIP Projection
+    # ─────────────────────────────
+    sip_evidence = []
+
+    if features.get("has_amount"):
+        sip_evidence.append("amount")
+
+    if features.get("has_tenure"):
+        sip_evidence.append("tenure")
+
+    if features.get("has_return_rate"):
+        sip_evidence.append("return_rate")
+
+    if any(k in ql for k in [
+        "sip", "future value", "projection",
+        "corpus", "invest", "calculate"
+    ]):
+        sip_evidence.append("sip_keyword")
+
+    if len(sip_evidence) >= 2:
+        add_op(
+            "sip_projection",
+            min(0.99, 0.5 + len(sip_evidence) * 0.1),
+            sip_evidence
+        )
+
+    # ─────────────────────────────
+    # Comparison
+    # ─────────────────────────────
+    compare_evidence = []
+
+    if features.get("is_comparative"):
+        compare_evidence.append("comparative_feature")
+
+    if any(k in ql for k in [
+        "compare", "vs", "better",
+        "which is better"
+    ]):
+        compare_evidence.append("comparison_keyword")
+
+    if compare_evidence:
+        add_op(
+            "fund_comparison",
+            0.9,
+            compare_evidence
+        )
+
+    # ─────────────────────────────
+    # Holdings
+    # ─────────────────────────────
+    holdings_evidence = []
+
+    if any(k in ql for k in [
+        "holdings", "portfolio",
+        "allocation", "stocks",
+        "invested in"
+    ]):
+        holdings_evidence.append("holdings_keyword")
+
+    if holdings_evidence:
+        add_op(
+            "holdings_analysis",
+            0.9,
+            holdings_evidence
+        )
+
+    # Dedup
+    dedup = {}
+    for op in ops:
+        dedup[op["type"]] = op
+
+    return list(dedup.values())
+
 # ══════════════════════════════════════════════════════════════════════════════
 # 5. NODE FUNCTIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
 
 async def rewriter_node(state: PipelineState, config: RunnableConfig) -> dict:
-    """Decompose the user query into a structured QueryPlan."""
+    """Decompose user query into 1-5 executable sub-tasks."""
+    start_time = time.perf_counter()
     messages = state["messages"]
     user_query = messages[-1].content if messages else ""
     logger.info(f"Rewriter: '{user_query[:60]}...'")
@@ -198,16 +349,35 @@ async def rewriter_node(state: PipelineState, config: RunnableConfig) -> dict:
 
         planner_msgs.append(HumanMessage(content=f"User Query: {user_query}"))
 
+        resolved_fund = state.get("shared_context", {}).get("_resolved_fund")
+        if resolved_fund:
+            msg = f"[PLANNER NOTE] Fund explicitly resolved by deterministic layer. Name: {resolved_fund['scheme_name']}, Code: {resolved_fund['scheme_code']}. DO NOT create a DISCOVERY task. Use this scheme_code directly for DATA/CALCULATOR/DOCUMENT tasks."
+            planner_msgs.append(SystemMessage(content=msg))
+
         # method="function_calling" avoids strict additionalProperties enforcement
         planner = get_planner_llm().with_structured_output(QueryPlan, method="function_calling")
         plan: QueryPlan = await planner.ainvoke(planner_msgs, config=config)
-        # Hard cap: max 3 tasks
-        if len(plan.tasks) > 3:
-            plan.tasks = plan.tasks[:3]
+        # Hard cap: max 5 tasks
+        if len(plan.tasks) > 5:
+            plan.tasks = plan.tasks[:5]
 
-        logger.info(f"Rewriter: {len(plan.tasks)} tasks, complexity={plan.complexity}")
+        # ── V3 Migration: Inject Operations ──
+        # Extract workflow operations using deterministic rules
+        features = _extract_features(user_query)
+        extracted_ops = extract_operations(user_query, features)
+        
+        logger.info(f"OperationsExtracted: {extracted_ops}")
+
+        # Inject operations into the planner's tasks
+        for task in plan.tasks:
+            task.operations = [Operation(**op) for op in extracted_ops]
+            logger.info(f"TaskOperations: intent={task.intent}, operations={task.operations}")
+
         # Convert typed Entities to plain dict for shared_context
         entities_dict = {k: v for k, v in plan.entities.model_dump().items() if v is not None}
+        
+        duration = time.perf_counter() - start_time
+        logger.info(f"Rewriter: {len(plan.tasks)} tasks, complexity={plan.complexity} (took {duration:.2f}s)")
         return {
             "query_plan": plan.model_dump(),
             "shared_context": entities_dict,
@@ -219,11 +389,14 @@ async def rewriter_node(state: PipelineState, config: RunnableConfig) -> dict:
             entities={},
             complexity="LOW",
         )
+        duration = time.perf_counter() - start_time
+        logger.info(f"Rewriter: fallback used (took {duration:.2f}s)")
         return {"query_plan": fallback.model_dump(), "shared_context": {}}
 
 
 async def controller_node(state: PipelineState, config: RunnableConfig) -> dict:
     """Validate plan, enforce guardrails, order tasks for execution."""
+    start_time = time.perf_counter()
     plan = QueryPlan(**state["query_plan"])
     logger.info(f"Controller: {len(plan.tasks)} tasks, complexity={plan.complexity}")
 
@@ -236,7 +409,19 @@ async def controller_node(state: PipelineState, config: RunnableConfig) -> dict:
     messages = state["messages"]
     user_query = messages[-1].content if messages else ""
 
-    has_scheme_code = bool(re.search(r'\b\d{5,6}\b', user_query))
+    resolved_fund = state.get("shared_context", {}).get("_resolved_fund")
+    has_scheme_code = bool(re.search(r'\b\d{5,6}\b', user_query)) or bool(resolved_fund)
+    
+    # Prune redundant DISCOVERY tasks if we already have a resolved fund
+    if resolved_fund:
+        pruned_ids = [t.id for t in tasks if t.intent == "DISCOVERY"]
+        if pruned_ids:
+            tasks = [t for t in tasks if t.id not in pruned_ids]
+            # Clean up dependencies in remaining tasks
+            for t in tasks:
+                t.requires = [r for r in t.requires if r not in pruned_ids]
+            logger.info(f"Controller: Pruned {len(pruned_ids)} redundant DISCOVERY tasks and cleaned dependencies.")
+
     has_discovery = any(t.intent == Intent.DISCOVERY for t in tasks)
     
     if not has_scheme_code and not has_discovery:
@@ -247,7 +432,7 @@ async def controller_node(state: PipelineState, config: RunnableConfig) -> dict:
                 id="task_forced_disc",
                 intent=Intent.DISCOVERY,
                 query=f"Find scheme code for: {user_query}",
-                priority=0,
+                priority=1,
                 requires=[]
             )
             for t in tasks:
@@ -255,10 +440,10 @@ async def controller_node(state: PipelineState, config: RunnableConfig) -> dict:
                     t.requires.append("task_forced_disc")
             tasks.insert(0, disc_task)
 
-    # Guardrail: max 3 agents executed (raised to accommodate forced DISCOVERY)
-    if len(tasks) > 3:
-        tasks = sorted(tasks, key=lambda t: t.priority)[:3]
-        logger.warning("Controller: trimmed to 3 tasks")
+    # Guardrail: max 5 agents executed (raised to accommodate forced DISCOVERY)
+    if len(tasks) > 5:
+        tasks = sorted(tasks, key=lambda t: t.priority)[:5]
+        logger.warning("Controller: trimmed to 5 tasks")
 
     # Guardrail: max 1 DOCUMENT agent (expensive)
     doc_tasks = [t for t in tasks if t.intent == Intent.DOCUMENT]
@@ -268,7 +453,16 @@ async def controller_node(state: PipelineState, config: RunnableConfig) -> dict:
 
     # Topological sort (respects dependencies, then priority)
     ordered = _topo_sort(tasks)
-    logger.info(f"Controller: executing {[t.intent.value for t in ordered]}")
+    
+    for t in ordered:
+        logger.info(
+            f"ControllerTask: "
+            f"intent={t.intent}, "
+            f"operations={[o.type for o in t.operations]}"
+        )
+    
+    duration = time.perf_counter() - start_time
+    logger.info(f"Controller: executing {[t.intent for t in ordered]} (took {duration:.2f}s)")
 
     return {"pending_tasks": [t.model_dump() for t in ordered], "current_task_index": 0}
 
@@ -305,23 +499,19 @@ def _topo_sort(tasks: List[SubTask]) -> List[SubTask]:
 
 
 async def executor_node(state: PipelineState, config: RunnableConfig) -> dict:
-    """Run the current task's specialist agent with strict dependency enforcement.
-
-    Stages:
-      1. PRE-CHECK  — block execution if any dependency is missing or failed
-      2. INJECT     — build structured DEPENDENCY OUTPUT for the agent
-      3. EXECUTE    — run the specialist ReAct agent
-      4. POST-CHECK — verify agent actually used dependency data
-      5. RETRY      — one retry with stronger instruction on violation
-    """
+    """Run the current task's specialist agent with strict dependency enforcement."""
+    start_time = time.perf_counter()
     pending = state["pending_tasks"]
     idx = state["current_task_index"]
 
     if idx >= len(pending):
+        duration = time.perf_counter() - start_time
+        logger.info(f"Executor: no pending tasks (took {duration:.2f}s)")
         return {"current_task_index": idx}
 
     task = SubTask(**pending[idx])
-    intent = task.intent.value
+    operations = task.operations or []
+    intent = task.intent
     logger.info(f"Executor: task '{task.id}' ({intent}): '{task.query[:50]}...'")
 
     # ── STAGE 1: PRE-CHECK — block if any dependency is missing or failed ──
@@ -339,6 +529,8 @@ async def executor_node(state: PipelineState, config: RunnableConfig) -> dict:
                 success=False,
                 error="dependency_failed",
             )
+            duration = time.perf_counter() - start_time
+            logger.info(f"Executor: '{task.id}' blocked (took {duration:.2f}s)")
             return {
                 "current_task_index": idx + 1,
                 "agent_results": [ar.model_dump()],
@@ -353,6 +545,15 @@ async def executor_node(state: PipelineState, config: RunnableConfig) -> dict:
     context_parts = []
     if ctx:
         context_parts.append(f"[Session context: {json.dumps(ctx)}]")
+        if "_resolved_fund" in ctx:
+            rf = ctx["_resolved_fund"]
+            context_parts.append(f"[RESOLVED ENTITY]: The fund '{rf['scheme_name']}' has been resolved to scheme_code '{rf['scheme_code']}'. Use this code for all tool calls.")
+        
+        # New: Inject all resolved schemes from the mapping
+        if "resolved_schemes" in ctx:
+            schemes = ctx["resolved_schemes"]
+            parts = [f"'{name}' (code: {code})" for code, name in schemes.items()]
+            context_parts.append(f"[ALL RESOLVED ENTITIES]: {', '.join(parts)}. Use these codes for multi-fund analysis.")
 
     for dep_id, dep in dep_data.items():
         # Always inject the natural-language answer
@@ -369,10 +570,35 @@ async def executor_node(state: PipelineState, config: RunnableConfig) -> dict:
     if context_parts:
         agent_msgs.append(SystemMessage(content="\n".join(context_parts)))
 
+    if operations:
+        op_lines = []
+
+        for op in operations:
+            op_lines.append(
+                f"- {op.type} "
+                f"(confidence={op.confidence}, "
+                f"evidence={op.evidence})"
+            )
+
+        operation_prompt = f"""
+CURRENT OPERATIONS:
+{chr(10).join(op_lines)}
+
+RULES:
+- Only execute these operations.
+- Avoid unrelated analysis.
+- Prefer the minimum required tools.
+- Do not perform speculative calculations.
+"""
+
+        agent_msgs.append(
+            SystemMessage(content=operation_prompt)
+        )
+
     agent_msgs.append(HumanMessage(content=task.query))
 
     # ── STAGE 3: EXECUTE ──
-    answer, extracted, sources = await _run_agent(intent, agent_msgs, config)
+    answer, extracted, sources = await _run_agent(intent, agent_msgs, config, operations)
 
     # ── STAGE 4: POST-CHECK — verify dependency usage ──
     dep_scheme = None
@@ -400,7 +626,7 @@ async def executor_node(state: PipelineState, config: RunnableConfig) -> dict:
                 )
             )
         )
-        answer, extracted, sources = await _run_agent(intent, retry_msgs, config)
+        answer, extracted, sources = await _run_agent(intent, retry_msgs, config, operations)
 
         used_code = str(extracted.get("scheme_code", ""))
         if used_code != dep_scheme:
@@ -421,8 +647,13 @@ async def executor_node(state: PipelineState, config: RunnableConfig) -> dict:
             }
 
     # ── Build final result ──
+    # Deep merge resolved_schemes to prevent losing previous funds
+    new_schemes = extracted.get("resolved_schemes", {})
+    existing_schemes = state.get("shared_context", {}).get("resolved_schemes", {})
+    
     updated_ctx = {**state.get("shared_context", {}), **extracted}
-
+    updated_ctx["resolved_schemes"] = {**existing_schemes, **new_schemes}
+    
     success = bool(answer)
     if intent == "DATA" and not extracted:
         success = False
@@ -437,10 +668,16 @@ async def executor_node(state: PipelineState, config: RunnableConfig) -> dict:
         success=success,
         error=None if success else "Agent produced no usable data",
     )
+    duration = time.perf_counter() - start_time
     logger.info(
         f"Executor: '{task.id}' done. success={ar.success}, {len(answer)} chars, "
-        f"shared_context keys={list(updated_ctx.keys())}"
+        f"shared_context keys={list(updated_ctx.keys())} (took {duration:.2f}s)"
     )
+    # Log the full shared_context values for debugging
+    try:
+        logger.info(f"Executor: Current shared_context values: {json.dumps(updated_ctx, default=str)}")
+    except Exception as e:
+        logger.warning(f"Executor: Could not log shared_context: {e}")
 
     return {
         "current_task_index": idx + 1,
@@ -450,10 +687,39 @@ async def executor_node(state: PipelineState, config: RunnableConfig) -> dict:
     }
 
 
-async def _run_agent(intent: str, agent_msgs: list, config: RunnableConfig) -> tuple[str, dict, list]:
+def get_tools_for_operations(intent: str, operations: list) -> list:
+    cfg = AGENT_CONFIG.get(intent, AGENT_CONFIG["GENERAL"])
+
+    if not operations:
+        return cfg["tools"]
+
+    allowed = set()
+
+    for op in operations:
+        op_type = op["type"] if isinstance(op, dict) else op.type
+
+        for tool_name in OPERATION_TOOL_MAP.get(op_type, []):
+            allowed.add(tool_name)
+
+    filtered = []
+
+    for tool in cfg["tools"]:
+        if tool.name in allowed:
+            filtered.append(tool)
+
+    return filtered or cfg["tools"]
+
+
+async def _run_agent(intent: str, agent_msgs: list, config: RunnableConfig, operations: list = None) -> tuple[str, dict, list]:
     """Execute a specialist agent and extract answer, data, and sources."""
     try:
-        agent = _get_agent(intent)
+        tools = get_tools_for_operations(intent, operations or [])
+        agent = create_react_agent(
+            get_llm(),
+            tools,
+            prompt=AGENT_CONFIG[intent]["prompt"]
+        )
+        
         result = await agent.ainvoke({"messages": agent_msgs}, config=config)
         out_msgs = result.get("messages", [])
 
@@ -476,6 +742,10 @@ async def _run_agent(intent: str, agent_msgs: list, config: RunnableConfig) -> t
                     pass
 
         extracted = _extract_tool_data(out_msgs)
+        logger.info(f"Executor: '{intent}' agent finished. Extracted keys: {list(extracted.keys())}")
+        if not extracted and intent == "DATA":
+            logger.warning(f"Executor: 'DATA' agent produced no structured data. Raw answer: {answer[:100]}...")
+
         return answer, extracted, sources
 
     except Exception as e:
@@ -496,9 +766,17 @@ def _extract_tool_data(messages: list) -> dict:
 
             # Handle discovery tool outputs (keys are scheme codes)
             numeric_keys = [k for k in c.keys() if str(k).isdigit() and len(str(k)) >= 5]
-            if len(numeric_keys) == 1:
-                data["scheme_code"] = numeric_keys[0]
-                data["fund"] = c[numeric_keys[0]]
+            if numeric_keys:
+                # Store all resolved schemes in a mapping
+                if "resolved_schemes" not in data:
+                    data["resolved_schemes"] = {}
+                for k in numeric_keys:
+                    data["resolved_schemes"][k] = c[k]
+                
+                # Maintain backward compatibility for single-fund flows
+                if len(numeric_keys) == 1:
+                    data["scheme_code"] = numeric_keys[0]
+                    data["fund"] = c[numeric_keys[0]]
 
             # Handle standard structured outputs
             for key, field in [
@@ -523,6 +801,9 @@ def _extract_tool_data(messages: list) -> dict:
                     data[field] = c[key]
         except (json.JSONDecodeError, TypeError, AttributeError):
             continue
+    
+    if data:
+        logger.debug(f"Extraction: successfully parsed {len(data)} fields: {list(data.keys())}")
     return data
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -574,6 +855,7 @@ def _auto_detect_mode(successful: list, results: list) -> str:
 
 async def synthesizer_node(state: PipelineState, config: RunnableConfig) -> dict:
     """Merge agent results into a final, mode-adaptive response."""
+    start_time = time.perf_counter()
     results = state.get("agent_results", [])
     messages = state["messages"]
     user_query = messages[-1].content if messages else ""
@@ -587,6 +869,8 @@ async def synthesizer_node(state: PipelineState, config: RunnableConfig) -> dict
     # ── Critical Data Guard ──
     if any(r.get("intent") == "DATA" and not r.get("data") for r in results):
         logger.warning("Synthesizer: DATA intent missing required data. Failing cleanly.")
+        duration = time.perf_counter() - start_time
+        logger.info(f"Synthesizer: failing due to missing data (took {duration:.2f}s)")
         return {
             "messages": [AIMessage(content="I couldn't retrieve the requested data. This can happen if the fund details are currently unavailable or the query was ambiguous. Please try with a specific fund name.")],
             "sources": [],
@@ -600,7 +884,7 @@ async def synthesizer_node(state: PipelineState, config: RunnableConfig) -> dict
     # ── Response Mode Selection ──
     if is_followup and prev_mode in ("concise", "analytical"):
         response_mode = "detailed"
-        logger.info(f"Synthesizer: follow-up detected (prev={prev_mode}), upgrading to 'detailed'")
+        logger.info(f"Synthesizer: follow-up (prev={prev_mode}), upgrading to 'detailed'")
     else:
         response_mode = _auto_detect_mode(successful, results)
         logger.info(f"Synthesizer: using '{response_mode}' mode")
@@ -670,6 +954,10 @@ async def synthesizer_node(state: PipelineState, config: RunnableConfig) -> dict
         )
 
         response = await get_llm().ainvoke(synth_msgs, config=config)
+        
+        duration = time.perf_counter() - start_time
+        logger.info(f"Synthesizer: response generated (took {duration:.2f}s)")
+        
         return {
             "messages": [AIMessage(content=response.content)],
             "sources": all_sources,
@@ -689,12 +977,14 @@ async def synthesizer_node(state: PipelineState, config: RunnableConfig) -> dict
 async def _detect_intent_hybrid(q: str, config: RunnableConfig) -> str:
     ql = q.lower()
     # 1. High-confidence deterministic rules
-    if any(k in ql for k in ["nav", "current price"]):
+    if any(k in ql for k in ["nav", "current price", "unit price"]):
         return "DATA"
-    if any(k in ql for k in ["sip", "xirr", "calculate"]):
+    if any(k in ql for k in ["sip", "xirr", "calculate", "corpus", "future value", "projection", "how much will i get"]):
         return "CALCULATOR"
-    if any(k in ql for k in ["factsheet"]):
+    if any(k in ql for k in ["factsheet", "holdings", "manager", "objective", "strategy", "invests in"]):
         return "DOCUMENT"
+    if any(k in ql for k in ["best", "top", "compare", "vs", "better", "returns", "performance", "cagr"]):
+        return "PERFORMANCE"
 
     # 2. LLM fallback for semantics
     try:
@@ -734,6 +1024,7 @@ def _extract_features(q: str) -> dict:
         "has_category": _has_category(q),
         "has_amount": "₹" in q or bool(re.search(r"\d", q)),
         "has_tenure": any(k in ql for k in ["year", "month", "yr", "years", "months"]),
+        "has_return_rate": any(k in ql for k in ["%", "return", "interest", "cagr", "rate"]),
         "has_risk": any(k in ql for k in ["risk", "safe", "aggressive", "conservative", "stable", "growth"]),
         "is_comparative": any(k in ql for k in ["best", "top", "compare", "better", "vs", "good"]),
         "is_short": len(ql.split()) <= 4,
@@ -759,6 +1050,8 @@ def _compute_completeness(intent: str, features: dict) -> tuple[float, List[str]
             ok = features["has_tenure"]
         elif r == "horizon":
             ok = features["has_tenure"]
+        elif r == "return_rate":
+            ok = features["has_return_rate"]
         elif r == "risk":
             ok = features["has_risk"]
 
@@ -793,6 +1086,7 @@ def _decide(completeness: float, ambiguity: float) -> str:
 
 
 async def intent_check_node(state: PipelineState, config: RunnableConfig) -> dict:
+    start_time = time.perf_counter()
     messages = state["messages"]
     query = messages[-1].content if messages else ""
 
@@ -830,6 +1124,12 @@ async def intent_check_node(state: PipelineState, config: RunnableConfig) -> dic
         }
 
     # 3. compute completeness
+    resolved_fund = state.get("shared_context", {}).get("_resolved_fund")
+    if resolved_fund:
+        # If we already resolved the fund, force completeness features for 'fund'
+        features["has_fund"] = True
+        logger.info("IntentCheck: Fund already resolved, boosting completeness features.")
+
     completeness, missing = _compute_completeness(intent, features)
 
     # 4. compute ambiguity
@@ -837,8 +1137,9 @@ async def intent_check_node(state: PipelineState, config: RunnableConfig) -> dic
 
     # 4. decision
     decision = _decide(completeness, ambiguity)
+    duration = time.perf_counter() - start_time
     logger.info(
-        f"IntentCheck: query='{query[:60]}', intent={intent}, completeness={completeness:.2f}, ambiguity={ambiguity:.2f}, decision={decision}"
+        f"IntentCheck: query='{query[:60]}', intent={intent}, completeness={completeness:.2f}, ambiguity={ambiguity:.2f}, decision={decision} (took {duration:.2f}s)"
     )
 
     result = IntentCheckResult(
@@ -897,6 +1198,7 @@ async def intent_check_node(state: PipelineState, config: RunnableConfig) -> dic
 
 async def clarify_node(state: PipelineState, config: RunnableConfig) -> dict:
     """Context-aware clarifier — dynamically builds targeted questions based on missing fields."""
+    start_time = time.perf_counter()
     intent_check = state.get("intent_check") or {}
 
     intent = intent_check.get("intent", "GENERAL")
@@ -920,6 +1222,9 @@ async def clarify_node(state: PipelineState, config: RunnableConfig) -> dict:
             # Optional Quick Choices for risk
             if intent == "PERFORMANCE" and field == "risk":
                 response += "\n\n**Quick options:**\n- Low risk\n- Moderate risk\n- High risk"
+            
+            duration = time.perf_counter() - start_time
+            logger.info(f"Clarify: targeted question generated (took {duration:.2f}s)")
             return {"messages": [AIMessage(content=response)], "sources": []}
 
     # Multiple missing fields: Build dynamic numbered list
@@ -958,6 +1263,8 @@ async def clarify_node(state: PipelineState, config: RunnableConfig) -> dict:
         for ex in deduped[:4]:
             response += f"- *{ex}*\n"
 
+    duration = time.perf_counter() - start_time
+    logger.info(f"Clarify: multi-field question generated (took {duration:.2f}s)")
     return {"messages": [AIMessage(content=response)], "sources": []}
 
 
@@ -1005,6 +1312,24 @@ def should_continue(state: PipelineState) -> str:
 # ══════════════════════════════════════════════════════════════════════════════
 
 
+# ── Global checkpointer setup ──
+_pool = None
+_memory_saver = None
+
+def get_checkpointer():
+    global _pool, _memory_saver
+    if _memory_saver is None:
+        from app.db.connection import DATABASE_URL
+        pg_url = DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+        
+        _pool = AsyncConnectionPool(
+            conninfo=pg_url,
+            max_size=20,
+            kwargs={"autocommit": True, "prepare_threshold": 0},
+        )
+        _memory_saver = AsyncPostgresSaver(_pool)
+    return _memory_saver
+
 def build_pipeline():
     """Build the v3 agentic pipeline graph.
 
@@ -1039,9 +1364,14 @@ def build_pipeline():
     g.add_edge("synthesizer", END)
     g.add_edge("clarify", END)
 
-    return g.compile()
+    checkpointer = get_checkpointer()
+    return g.compile(checkpointer=checkpointer)
 
-
+async def setup_checkpointer():
+    """Called during app startup to create LangGraph tables."""
+    memory = get_checkpointer()
+    await memory.setup()
+    
 def _warm_agent_cache() -> None:
     """Pre-create all ReAct agents at startup to avoid async race conditions."""
     for intent in AGENT_CONFIG:
@@ -1087,13 +1417,13 @@ def _build_messages(user_input: str, chat_history: List[BaseMessage] = None) -> 
     return messages
 
 
-def _initial_state(messages: List[BaseMessage], last_response_mode: Optional[str] = None) -> dict:
+def _initial_state(messages: List[BaseMessage], last_response_mode: Optional[str] = None, initial_context: dict = None) -> dict:
     """Build the initial PipelineState dict for graph invocation."""
     return {
         "messages": messages,
         "intent_check": None,
         "query_plan": None,
-        "shared_context": {},
+        "shared_context": initial_context or {},
         "pending_tasks": [],
         "current_task_index": 0,
         "agent_results": [],
@@ -1141,7 +1471,6 @@ def _get_langfuse_config(session_id: str = None, user_id: str = None) -> dict:
 
 async def run_agent_query(
     user_input: str,
-    chat_history: List[BaseMessage] = None,
     last_response_mode: Optional[str] = None,
     session_id: Optional[str] = None,
 ) -> dict:
@@ -1175,16 +1504,36 @@ async def run_agent_query(
             "error": False,
         }
 
+    # ── FUND RESOLVER LAYER ────────────────────────────────────────────────────
+    resolver_res = resolve_fund(user_input)
+    initial_context = {}
+    if resolver_res.resolved and resolver_res.best_match:
+        initial_context["_resolved_fund"] = {
+            "scheme_code": resolver_res.best_match.scheme_code,
+            "scheme_name": resolver_res.best_match.scheme_name,
+        }
+
     # ── GRAPH EXECUTION ────────────────────────────────────────────────────────
     logger.info(f"Running query: '{user_input[:50]}...'")
     graph = get_pipeline()
-    messages = _build_messages(user_input, chat_history)
     config = _get_langfuse_config(session_id=session_id)
 
     try:
-        result = await graph.ainvoke(
-            _initial_state(messages, last_response_mode=last_response_mode), config=config
-        )
+        config["configurable"] = {"thread_id": session_id or "default_session"}
+        payload = {
+            "messages": [HumanMessage(content=user_input)],
+            "intent_check": None,
+            "query_plan": None,
+            "shared_context": initial_context or {},  # Reset explicitly to avoid bleed
+            "pending_tasks": [],
+            "current_task_index": 0,
+            "agent_results": None,  # triggers clear
+            "sources": [],
+            "error": None,
+            "last_response_mode": last_response_mode,
+        }
+
+        result = await graph.ainvoke(payload, config=config)
 
         final_output = _extract_final_output(result["messages"])
         plan = result.get("query_plan", {})
@@ -1225,9 +1574,40 @@ async def run_agent_query(
         }
 
 
+async def _rebuild_context_from_checkpoint(session_id: str, user_input: str) -> RouteContext:
+    """Peek at checkpoint state to get last fund/entity for routing context.
+
+    This is NOT a full state restore — it's a lightweight read of just the
+    shared_context from the last checkpoint, used only to make the routing
+    decision smarter.
+    """
+    try:
+        checkpointer = get_checkpointer()
+        config = {"configurable": {"thread_id": session_id}}
+
+        # Read the latest checkpoint without running any nodes
+        checkpoint = await checkpointer.aget_tuple(config)
+        if checkpoint and checkpoint.checkpoint:
+            state = checkpoint.checkpoint.get("channel_values", {})
+            shared_ctx = state.get("shared_context", {})
+
+            resolved = shared_ctx.get("_resolved_fund")
+            if resolved:
+                return RouteContext(
+                    last_fund_name=resolved.get("scheme_name"),
+                    last_fund_code=resolved.get("scheme_code"),
+                    last_response_mode=state.get("last_response_mode"),
+                    last_intent=None,  # not explicitly stored separately in state
+                    turn_count=2,      # we know it's at least turn 2
+                )
+    except Exception as e:
+        logger.debug(f"Could not read checkpoint for routing context: {e}")
+
+    return RouteContext()
+
+
 async def stream_agent_query(
     user_input: str,
-    chat_history: List[BaseMessage] = None,
     last_response_mode: Optional[str] = None,
     session_id: Optional[str] = None,
 ) -> AsyncGenerator[dict, None]:
@@ -1241,7 +1621,21 @@ async def stream_agent_query(
     logger.info(f"Streaming query: '{user_input[:50]}...'")
 
     # ── ROUTING LAYER ──────────────────────────────────────────────────────────
-    route_type, lightweight_res = await route_message(user_input)
+    # Build route context for the session
+    route_context = RouteContext(last_response_mode=last_response_mode)
+    
+    # 1. Deterministic check (current query mentions a fund)
+    resolver_res = resolve_fund(user_input)
+    if resolver_res.resolved and resolver_res.best_match:
+        route_context.last_fund_name = resolver_res.best_match.scheme_name
+        route_context.last_fund_code = resolver_res.best_match.scheme_code
+    
+    # 2. Checkpoint check (previous turn mentioned a fund)
+    if not route_context.last_fund_name and session_id:
+        route_context = await _rebuild_context_from_checkpoint(session_id, user_input)
+
+    # 3. Decision
+    route_type, lightweight_res = await route_message(user_input, context=route_context)
 
     if route_type in ("static", "no_tool"):
         logger.info(f"Query handled by router ({route_type}). Bypassing graph.")
@@ -1252,15 +1646,15 @@ async def stream_agent_query(
             "display": "Responding",
         }
         
-        if route_type == "static":
-            # Stream the response back in chunks
+        if route_type == "static" or lightweight_res:
+            # Stream the response back in chunks (deterministic or static)
             yield {
                 "type": "token",
                 "content": lightweight_res,
                 "node": "router",
             }
         else:
-            async for word in stream_no_tool_response(user_input):
+            async for word in stream_no_tool_response(user_input, context=route_context):
                 yield {
                     "type": "token",
                     "content": word,
@@ -1286,11 +1680,40 @@ async def stream_agent_query(
         }
         return
 
-    # ── GRAPH EXECUTION ────────────────────────────────────────────────────────
-    graph = get_pipeline()
-    messages = _build_messages(user_input, chat_history)
+    # ── FUND RESOLVER LAYER ────────────────────────────────────────────────────
     config = _get_langfuse_config(session_id=session_id)
+    config["configurable"] = {"thread_id": session_id or "default_session"}
+    graph = get_pipeline()
+    
+    # Check if we already have a resolved fund in the session state
+    existing_resolved_fund = None
+    try:
+        state_snapshot = await graph.aget_state(config)
+        if state_snapshot.values:
+            existing_resolved_fund = state_snapshot.values.get("shared_context", {}).get("_resolved_fund")
+    except Exception as e:
+        logger.warning(f"Could not fetch existing state for fund resolution check: {e}")
 
+    initial_context = {}
+    if not existing_resolved_fund:
+        # We might have already resolved it in the routing layer above
+        if route_context.last_fund_name and route_context.last_fund_code:
+             initial_context["_resolved_fund"] = {
+                "scheme_code": route_context.last_fund_code,
+                "scheme_name": route_context.last_fund_name,
+            }
+        else:
+            resolver_res = resolve_fund(user_input)
+            if resolver_res.resolved and resolver_res.best_match:
+                logger.info(f"Resolver: New fund resolved for session {session_id}: {resolver_res.best_match.scheme_name}")
+                initial_context["_resolved_fund"] = {
+                    "scheme_code": resolver_res.best_match.scheme_code,
+                    "scheme_name": resolver_res.best_match.scheme_name,
+                }
+    else:
+        logger.info(f"Resolver: Using existing resolved fund for session {session_id}")
+
+    # ── GRAPH EXECUTION ────────────────────────────────────────────────────────
     PIPELINE_NODES = {"intent_check", "rewriter", "controller", "executor", "synthesizer", "clarify"}
     DISPLAY_NAMES = {
         "intent_check": "Analyzing",
@@ -1307,8 +1730,26 @@ async def stream_agent_query(
         tokens_emitted_nodes: set = set()  # track per-node to allow independent passthroughs
         final_state: dict = {}
 
+        # Detect capability for state injection
+        requested_capability = detect_requested_capability(user_input)
+
+        config["configurable"] = {"thread_id": session_id or "default_session"}
+        payload = {
+            "messages": [HumanMessage(content=user_input)],
+            "intent_check": None,
+            "query_plan": None,
+            "shared_context": initial_context,  # Merged with existing state by reducer
+            "pending_tasks": [],
+            "current_task_index": 0,
+            "agent_results": None,  # triggers clear
+            "sources": [],
+            "error": None,
+            "last_response_mode": last_response_mode,
+            "requested_capability": requested_capability,
+        }
+
         async for event in graph.astream_events(
-            _initial_state(messages, last_response_mode=last_response_mode),
+            payload,
             config=config,
             version="v2",
         ):
@@ -1403,4 +1844,7 @@ async def stream_agent_query(
 
     except Exception as e:
         logger.error(f"Streaming error: {str(e)}", exc_info=True)
-        yield {"type": "error", "message": str(e)}
+        yield {
+            "type": "error",
+            "message": "I encountered an error while processing your request. Please try again or rephrase your question."
+        }
