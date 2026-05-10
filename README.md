@@ -17,9 +17,8 @@
 
 ## 🌟 Flagship Features
 
-| Feature | Description |
-| :--- | :--- |
-| **🧠 Multi-Step Planner** | Decomposes complex financial queries into up to 5 strategic sub-tasks for exhaustive research. |
+| **🧠 Multi-Step Planner** | The primary graph gate that decomposes complex financial queries into up to 5 strategic sub-tasks. |
+| **🛡️ Smart Fund Resolver** | A semantic entity resolution layer that maps colloquial fund names to exact AMFI codes with 95%+ accuracy. |
 | **🔄 Operation-Centric** | Advanced ReAct orchestration that maintains a shared context layer for cross-tool entity resolution. |
 | **📈 SIP Simulation Engine** | Robust backtesting tool for historical SIP returns and CAGR-based future projections with yearly top-ups. |
 | **📑 3-Layer PDF Engine** | High-fidelity extraction using `pdfplumber`, `PyMuPDF`, and `Tesseract OCR` fallback for scanned financial reports. |
@@ -32,18 +31,24 @@
 ## 📊 System Architecture
 
 ### 🔄 Operation-Centric Reasoning Loop
-Determines the most accurate path by decomposing complex queries into actionable operations.
+FinSight utilizes a multi-node LangGraph architecture with specialized gates:
+
+1.  **The Planner (Gate 1)**: Rewrites and decomposes the query into a sequence of dependent operations.
+2.  **The Executor (Gate 2)**: A dynamic routing loop that selects the best specialist tool (RAG, Performance, or Calculator) based on the current sub-task.
+3.  **The Synthesizer (Final Gate)**: Aggregates findings from all operations into a cohesive, evidence-backed response.
 
 ```mermaid
 graph TD
-    A[User Query] --> B[Query Rewriter/Planner]
+    A[User Query] --> B[Planner Node]
     B --> C{Sub-task Manager}
-    C -- Operation 1 --> D[Performance Specialist]
-    C -- Operation 2 --> E[Calculator Specialist]
-    C -- Operation 3 --> F[RAG Specialist]
+    C -- "Entity Resolved?" --> R[Smart Fund Resolver]
+    R --> C
+    C -- "Next Operation" --> D[Performance Specialist]
+    C -- "Next Operation" --> E[Calculator Specialist]
+    C -- "Next Operation" --> F[RAG Specialist]
     D & E & F --> G[Shared Context Layer]
     G --> C
-    C -- All Tasks Done --> H[Response Synthesizer]
+    C -- "All Tasks Done" --> H[Synthesizer Node]
     H --> I[Final Answer with Citations]
 ```
 
