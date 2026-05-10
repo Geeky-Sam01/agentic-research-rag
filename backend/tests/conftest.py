@@ -1,6 +1,20 @@
+import os
 from unittest.mock import Mock
 
 import pytest
+
+# ── Set required env vars before importing app modules ────────────────────────
+os.environ.setdefault("OPENROUTER_API_KEY", "test-key")
+os.environ.setdefault("PORT", "8000")
+os.environ.setdefault("HOST", "0.0.0.0")
+os.environ.setdefault("DEBUG", "false")
+os.environ.setdefault("CORS_ORIGIN", "*")
+os.environ.setdefault("INDEX_PATH", "/tmp/test_indices")
+os.environ.setdefault("UPLOAD_PATH", "/tmp/test_uploads")
+os.environ.setdefault("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+os.environ.setdefault("EMBEDDING_DIM", "384")
+os.environ.setdefault("LLM_MODEL", "openrouter/free")
+os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://user:pass@localhost/db")
 
 import app.services.agent_tools as agent_tools
 
